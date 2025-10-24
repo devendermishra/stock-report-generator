@@ -1,2 +1,399 @@
-# stock-report-generator
-Stock Report Generator generates stock research report for single or multiple scrips present in NSE.
+# Stock Report Generator for NSE
+
+A sophisticated multi-agent AI system that generates comprehensive equity research reports for NSE stocks using **LangGraph** orchestration and **Model Context Protocol (MCP)** for collaborative reasoning.
+
+## 🎯 Overview
+
+This system demonstrates advanced AI collaboration by using multiple specialized agents that work together to analyze stocks from different perspectives:
+
+- **Sector Analysis** - Market trends and peer comparison
+- **Stock Research** - Financial metrics and technical analysis  
+- **Management Analysis** - Strategic insights from reports and calls
+- **Report Review** - Final synthesis and professional formatting
+
+## 🏗️ Architecture
+
+### Multi-Agent System
+```
+User Input (Stock Symbol)
+     │
+     ▼
+[ SectorResearcherAgent ] ─► sector_summary
+     │
+     ▼
+[ StockResearcherAgent ] ─► stock_summary
+     │
+     ▼
+[ ManagementAnalysisAgent ] ─► management_summary
+     │
+     ▼
+[ ReportReviewerAgent ] ─► final_report.md
+```
+
+### Key Components
+
+#### 🤖 Agents (4 Total)
+1. **SectorResearcherAgent** - Analyzes sector trends, peer comparison, regulatory environment
+2. **StockResearcherAgent** - Retrieves financial data, technical analysis, valuation metrics
+3. **ManagementAnalysisAgent** - Processes reports, extracts management insights
+4. **ReportReviewerAgent** - Synthesizes all outputs into final professional report
+
+#### 🛠️ Tools (7 Total)
+1. **WebSearchTool** - Fetches sector news and market trends (DuckDuckGo search - free, no API key required)
+2. **StockDataTool** - Retrieves stock data and metrics (yfinance, NSE API)
+3. **ReportFetcherTool** - Downloads financial reports and transcripts
+4. **PDFParserTool** - Extracts and processes text from PDF documents
+5. **SummarizerTool** - AI-powered text summarization and insight extraction
+6. **ReportFormatterTool** - Generates professional markdown reports
+7. **PDFGeneratorTool** - Converts markdown reports to professional PDF format
+
+#### 🔄 LangGraph Orchestration
+- **Workflow Management** - Coordinates agent execution
+- **Error Handling** - Graceful failure recovery
+- **State Management** - Tracks progress across agents
+- **Conditional Logic** - Smart routing based on results
+
+#### 🧠 MCP Context Sharing
+- **Shared Memory** - Agents access previous outputs
+- **Data Persistence** - Maintains context across workflow
+- **Conflict Resolution** - Handles data inconsistencies
+- **Quality Assurance** - Validates and enhances outputs
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.10+
+- OpenAI API key
+- Tavily API key (for web search)
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd stock-report-generator
+```
+
+2. **Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+3. **Set up environment variables**
+```bash
+cp env.example .env
+# Edit .env with your API keys
+```
+
+4. **Run the system**
+```bash
+cd src
+python main.py --symbol RELIANCE --company "Reliance Industries Limited" --sector "Oil & Gas"
+```
+
+### Example Usage
+
+```bash
+# Generate report for Reliance Industries
+python main.py --symbol RELIANCE --company "Reliance Industries Limited" --sector "Oil & Gas"
+
+# Generate report for TCS
+python main.py --symbol TCS --company "Tata Consultancy Services" --sector "IT"
+
+# Generate report for HDFC Bank
+python main.py --symbol HDFCBANK --company "HDFC Bank Limited" --sector "Banking"
+```
+
+## 📊 Generated Report Structure
+
+The system generates comprehensive reports in both **Markdown** and **PDF** formats with:
+
+### 📋 Executive Summary
+- Key highlights and metrics
+- Investment thesis
+- Management outlook
+- Recommendation summary
+
+### 🏢 Company Overview
+- Basic information and trading data
+- Financial metrics (P/E, P/B, EPS, etc.)
+- Market cap and valuation ratios
+
+### 🏭 Sector Analysis
+- Sector trends and outlook
+- Peer comparison
+- Regulatory environment
+- Growth opportunities
+
+### 📈 Financial Performance
+- Revenue and profit growth
+- Valuation metrics
+- Technical analysis
+- Performance indicators
+
+### 💼 Management Discussion
+- Strategic initiatives
+- Growth opportunities
+- Risk factors
+- Management outlook
+
+### 🎯 Investment Recommendation
+- Investment thesis
+- Target price and valuation
+- Risk-reward profile
+- Time horizon
+
+### ⚠️ Risk Factors
+- Sector-specific risks
+- Company risks
+- Market risks
+- Regulatory risks
+
+## 📄 PDF Generation
+
+The system automatically generates professional PDF reports alongside markdown files. PDF reports feature:
+
+### 🎨 Professional Styling
+- Clean, professional layout with proper typography
+- Color-coded sections for easy navigation
+- Consistent formatting and spacing
+- Executive summary highlighting
+- Financial metrics emphasis
+
+### 📋 PDF Features
+- **Automatic Generation**: PDFs are created automatically with each report
+- **Professional Layout**: A4 format with proper margins and headers
+- **Styled Sections**: Different visual treatments for various report sections
+- **Bold Text Support**: Proper formatting of bold text and emphasis
+- **List Formatting**: Clean bullet points and numbered lists
+
+### 🛠️ PDF Tools
+- **PDFGeneratorTool**: Core PDF generation functionality
+- **Batch Conversion**: Convert multiple markdown files to PDF
+- **Custom Styling**: Professional financial report styling
+- **Utility Script**: Standalone PDF conversion tool
+
+### 📝 Usage Examples
+
+```bash
+# Generate PDF from existing markdown report
+python generate_pdf_from_markdown.py reports/stock_report_ICICIBANK_20251021_200913.md
+
+# Batch convert all markdown files to PDF
+python generate_pdf_from_markdown.py --batch reports/
+
+# Convert with custom output directory
+python generate_pdf_from_markdown.py --output-dir my_pdfs reports/stock_report_ICICIBANK_20251021_200913.md
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+# Required
+OPENAI_API_KEY=your_openai_api_key
+# Note: TAVILY_API_KEY removed - now using free DuckDuckGo search
+
+# Optional
+ANTHROPIC_API_KEY=your_anthropic_api_key
+NSE_API_KEY=your_nse_api_key
+DEFAULT_MODEL=gpt-4o-mini
+OUTPUT_DIR=reports
+```
+
+### Model Configuration
+- **Default Model**: GPT-4o-mini (cost-effective)
+- **Max Tokens**: 4000 per request
+- **Temperature**: 0.1 (consistent outputs)
+- **Context Size**: 10,000 entries
+
+## 🏛️ Project Structure
+
+```
+src/
+├── agents/                    # AI Agents
+│   ├── sector_researcher.py   # Sector analysis agent
+│   ├── stock_researcher.py    # Stock research agent
+│   ├── management_analysis.py # Management analysis agent
+│   └── report_reviewer.py     # Final report agent
+├── tools/                     # MCP Tools
+│   ├── web_search_tool.py     # Web search capabilities
+│   ├── stock_data_tool.py     # Stock data retrieval
+│   ├── report_fetcher_tool.py # Report downloading
+│   ├── pdf_parser_tool.py     # PDF processing
+│   ├── summarizer_tool.py     # Text summarization
+│   ├── report_formatter_tool.py # Report formatting
+│   └── pdf_generator_tool.py  # PDF generation
+├── graph/                     # LangGraph Orchestration
+│   ├── context_manager_mcp.py # MCP context management
+│   └── stock_report_graph.py  # Workflow orchestration
+├── main.py                    # Entry point
+├── config.py                  # Configuration
+└── generate_pdf_from_markdown.py # PDF conversion utility
+```
+
+## 🔍 How It Works
+
+### 1. **Sector Research Phase**
+- Searches for sector news and trends
+- Analyzes peer company performance
+- Researches regulatory environment
+- Uses AI to synthesize insights
+
+### 2. **Stock Research Phase**
+- Retrieves real-time stock data
+- Calculates technical indicators
+- Performs valuation analysis
+- Generates investment rating
+
+### 3. **Management Analysis Phase**
+- Downloads financial reports
+- Extracts management insights
+- Analyzes strategic initiatives
+- Identifies risks and opportunities
+
+### 4. **Report Review Phase**
+- Combines all agent outputs
+- Checks for consistency
+- Resolves conflicts
+- Formats final report
+
+## 🛡️ Error Handling & Quality Assurance
+
+### Robust Error Handling
+- **Graceful Degradation** - System continues with partial data
+- **Fallback Analysis** - AI-generated content when data unavailable
+- **Error Recovery** - Automatic retry mechanisms
+- **Quality Validation** - Consistency checking across agents
+
+### Data Quality Assurance
+- **Source Validation** - Verifies data sources
+- **Consistency Checking** - Identifies conflicting information
+- **Confidence Scoring** - Rates analysis reliability
+- **Quality Metrics** - Tracks report completeness
+
+## 📈 Performance & Scalability
+
+### Optimization Features
+- **Parallel Processing** - Agents can run concurrently
+- **Caching** - Reuses previously fetched data
+- **Rate Limiting** - Respects API limits
+- **Memory Management** - Efficient context storage
+
+### Monitoring & Logging
+- **Comprehensive Logging** - Tracks all operations
+- **Performance Metrics** - Measures execution time
+- **Error Tracking** - Monitors failures
+- **Context Inspection** - Debug workflow state
+
+## 🔧 Advanced Usage
+
+### Custom Configuration
+```python
+from src.main import StockReportGenerator
+
+generator = StockReportGenerator()
+generator.initialize()
+
+# Generate report programmatically
+result = await generator.generate_report(
+    stock_symbol="RELIANCE",
+    company_name="Reliance Industries Limited",
+    sector="Oil & Gas"
+)
+```
+
+### Workflow Status Monitoring
+```python
+# Check workflow status
+status = generator.get_report_status("RELIANCE")
+print(f"Status: {status['status']['workflow_status']}")
+
+# Export workflow data
+export_data = generator.export_workflow_data("RELIANCE")
+```
+
+## 🧪 Testing & Development
+
+### Running Tests
+```bash
+pytest tests/
+```
+
+### Code Quality
+```bash
+# Format code
+black src/
+
+# Lint code
+flake8 src/
+
+# Type checking
+mypy src/
+```
+
+### Development Setup
+```bash
+# Install development dependencies
+pip install -r requirements.txt
+
+# Set up pre-commit hooks
+pre-commit install
+```
+
+## 📚 API Documentation
+
+### Core Classes
+
+#### `StockReportGenerator`
+Main orchestrator class for the system.
+
+#### `MCPContextManager`
+Manages shared memory and context between agents.
+
+#### `StockReportGraph`
+LangGraph workflow orchestrator.
+
+### Key Methods
+
+#### `generate_report(stock_symbol, company_name, sector)`
+Generates a comprehensive stock report.
+
+#### `get_report_status(stock_symbol)`
+Gets the current status of report generation.
+
+#### `export_workflow_data(stock_symbol)`
+Exports complete workflow data for analysis.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+For issues and questions:
+1. Check the logs in `stock_report_generator.log`
+2. Review the error messages
+3. Verify API keys are correct
+4. Ensure all dependencies are installed
+
+## 🔮 Future Enhancements
+
+- **Real-time Data Integration** - Live market data feeds
+- **Advanced Analytics** - Machine learning models
+- **Portfolio Analysis** - Multi-stock comparison
+- **Custom Templates** - Configurable report formats
+- **API Endpoints** - REST API for integration
+- **Dashboard Interface** - Web-based UI
+
+---
+
+**Built with ❤️ using LangGraph, MCP, and modern AI technologies.**
