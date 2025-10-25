@@ -6,8 +6,17 @@ WORKDIR /app
 
 # GPU Support (Optional)
 # Uncomment the following lines for GPU support
+# Note: Requires nvidia-docker runtime and CUDA-compatible GPU
 # ENV NVIDIA_VISIBLE_DEVICES=all
 # ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+# 
+# For GPU support, use nvidia/cuda base image instead:
+# FROM nvidia/cuda:11.8-devel-ubuntu22.04
+# 
+# GPU Requirements:
+# - NVIDIA GPU with CUDA Compute Capability 6.0+
+# - nvidia-docker2 or Docker with GPU support
+# - CUDA Toolkit 11.8+ installed on host
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

@@ -64,6 +64,7 @@ User Input (Stock Symbol)
 ### Prerequisites
 - Python 3.10+
 - OpenAI API key
+- **Optional**: NVIDIA GPU with CUDA support for accelerated AI processing
 
 ### Installation
 
@@ -102,6 +103,35 @@ python main.py --symbol TCS --company "Tata Consultancy Services" --sector "IT"
 # Generate report for HDFC Bank
 python main.py --symbol HDFCBANK --company "HDFC Bank Limited" --sector "Banking"
 ```
+
+## 🚀 GPU Acceleration (Optional)
+
+For enhanced performance with AI models, you can enable GPU acceleration:
+
+### GPU Setup
+```bash
+# Install GPU dependencies
+pip install -r requirements-gpu.txt
+
+# Verify GPU support
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+```
+
+### Docker with GPU Support
+```bash
+# Build GPU-enabled image
+docker build -f Dockerfile.gpu -t stock-report-generator:gpu .
+
+# Run with GPU support
+docker run --gpus all -it stock-report-generator:gpu
+```
+
+### GPU Requirements
+- NVIDIA GPU with CUDA Compute Capability 6.0+
+- CUDA Toolkit 11.8 or 12.0
+- 4GB+ GPU memory (8GB+ recommended)
+
+📖 **Detailed GPU setup guide**: [docs/GPU_SETUP.md](docs/GPU_SETUP.md)
 
 ## 📊 Generated Report Structure
 

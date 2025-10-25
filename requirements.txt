@@ -54,6 +54,25 @@ seaborn==0.13.0
 
 # GPU Support (Optional)
 # Uncomment the following lines if you want GPU acceleration for AI models
-# tensorflow-gpu>=2.13.0  # For TensorFlow GPU support
-# torch>=2.0.0  # For PyTorch GPU support
-# cupy>=12.0.0  # For CUDA array operations
+# Note: GPU support requires CUDA-compatible hardware and drivers
+# 
+# TensorFlow GPU Support
+# tensorflow-gpu>=2.13.0  # For TensorFlow GPU support (requires CUDA 11.8+)
+# 
+# PyTorch GPU Support  
+# torch>=2.0.0  # For PyTorch GPU support (requires CUDA 11.8+)
+# torchvision>=0.15.0  # For computer vision with GPU
+# torchaudio>=2.0.0  # For audio processing with GPU
+#
+# CUDA Array Operations
+# cupy>=12.0.0  # For CUDA array operations (requires CUDA 11.2+)
+#
+# Additional GPU Libraries
+# nvidia-ml-py>=11.0.0  # For GPU monitoring and management
+# accelerate>=0.20.0  # For distributed training and inference
+#
+# System Requirements:
+# - NVIDIA GPU with CUDA Compute Capability 6.0 or higher
+# - CUDA Toolkit 11.8 or 12.0
+# - cuDNN 8.6 or higher
+# - NVIDIA drivers 520.61.05 or higher
