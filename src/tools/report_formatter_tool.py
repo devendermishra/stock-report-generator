@@ -8,9 +8,16 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 import re
 import os
+import random
+import numpy as np
+
+# Set random seeds for reproducibility
+random.seed(42)
+np.random.seed(42)
 
 from .report_formatter_models import ReportSection, ConsistencyIssue, FormattedReport
 from .report_formatter_utils import ReportFormatterUtils
+from .report_formatter_helpers import FinancialFormatter, TechnicalFormatter, PeerAnalysisFormatter, SWOTFormatter
 from .technical_analysis_formatter import TechnicalAnalysisFormatter
 from ..exceptions import ReportGenerationError
 
@@ -302,6 +309,13 @@ class ReportFormatterTool:
         self.output_dir = output_dir
         self.utils = ReportFormatterUtils()
         self.technical_formatter = TechnicalAnalysisFormatter()
+        
+        # Initialize helper formatters
+        self.financial_formatter = FinancialFormatter()
+        self.technical_formatter_helper = TechnicalFormatter()
+        self.peer_formatter = PeerAnalysisFormatter()
+        self.swot_formatter = SWOTFormatter()
+        
         os.makedirs(output_dir, exist_ok=True)
         
     def format_report(

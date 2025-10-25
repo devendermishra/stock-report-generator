@@ -4,6 +4,11 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# GPU Support (Optional)
+# Uncomment the following lines for GPU support
+# ENV NVIDIA_VISIBLE_DEVICES=all
+# ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \

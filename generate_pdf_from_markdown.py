@@ -14,7 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from tools.pdf_generator_tool import PDFGeneratorTool
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate PDF from markdown stock reports",
         formatter_class=argparse.RawDescriptionHelpFormatter,

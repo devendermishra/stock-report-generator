@@ -9,7 +9,7 @@ import subprocess
 import shutil
 from pathlib import Path
 
-def check_python_version():
+def check_python_version() -> bool:
     """Check if Python version is compatible."""
     if sys.version_info < (3, 10):
         print("❌ Python 3.10+ is required")
@@ -18,7 +18,7 @@ def check_python_version():
     print(f"✅ Python version: {sys.version}")
     return True
 
-def install_dependencies():
+def install_dependencies() -> bool:
     """Install required dependencies."""
     try:
         print("📦 Installing dependencies...")
@@ -29,7 +29,7 @@ def install_dependencies():
         print(f"❌ Failed to install dependencies: {e}")
         return False
 
-def create_directories():
+def create_directories() -> bool:
     """Create necessary directories."""
     directories = ["reports", "temp", "logs"]
     
@@ -39,7 +39,7 @@ def create_directories():
     
     return True
 
-def setup_environment():
+def setup_environment() -> bool:
     """Set up environment configuration."""
     env_example = "env.example"
     env_file = ".env"
@@ -56,7 +56,7 @@ def setup_environment():
     
     return True
 
-def verify_setup():
+def verify_setup() -> bool:
     """Verify the setup is correct."""
     print("\n🔍 Verifying setup...")
     
@@ -78,7 +78,7 @@ def verify_setup():
     print("✅ Setup verification passed")
     return True
 
-def main():
+def main() -> bool:
     """Main setup function."""
     print("Stock Report Generator - Setup")
     print("=============================")

@@ -5,7 +5,7 @@ Test script to verify the Stock Report Generator installation.
 import sys
 import os
 
-def test_imports():
+def test_imports() -> bool:
     """Test that all required packages can be imported."""
     print("🧪 Testing package imports...")
     
@@ -64,7 +64,7 @@ def test_imports():
         print(f"❌ Unexpected error: {e}")
         return False
 
-def test_basic_functionality():
+def test_basic_functionality() -> bool:
     """Test basic functionality of key packages."""
     print("\n🔧 Testing basic functionality...")
     
@@ -97,7 +97,7 @@ def test_basic_functionality():
         print(f"❌ Functionality test error: {e}")
         return False
 
-def test_project_structure():
+def test_project_structure() -> bool:
     """Test that the project structure is correct."""
     print("\n📁 Testing project structure...")
     
@@ -123,7 +123,7 @@ def test_project_structure():
         print("✅ All required files present")
         return True
 
-def main():
+def main() -> bool:
     """Main test function."""
     print("Stock Report Generator - Installation Test")
     print("=" * 50)

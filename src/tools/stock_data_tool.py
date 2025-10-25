@@ -1,6 +1,9 @@
 """
 Stock Data Tool for retrieving stock data and metrics.
 Uses Yahoo Finance API for comprehensive stock analysis.
+
+Copyright (c) 2024 Stock Report Generator
+All rights reserved.
 """
 
 import yfinance as yf
