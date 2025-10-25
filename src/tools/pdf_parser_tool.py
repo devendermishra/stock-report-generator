@@ -64,6 +64,12 @@ class PDFParserTool:
             if not os.path.exists(file_path):
                 logger.error(f"PDF file not found: {file_path}")
                 return None
+            
+            # Check if file is too small (likely placeholder)
+            file_size = os.path.getsize(file_path)
+            if file_size < 1000:  # Less than 1KB is likely a placeholder
+                logger.warning(f"PDF file {file_path} is very small ({file_size} bytes), likely a placeholder")
+                return self._create_placeholder_document(file_path)
                 
             # Try PyMuPDF first (better for complex PDFs)
             try:
@@ -74,6 +80,40 @@ class PDFParserTool:
                 
         except Exception as e:
             logger.error(f"Failed to parse PDF {file_path}: {e}")
+            return None
+    
+    def _create_placeholder_document(self, file_path: str) -> ParsedDocument:
+        """Create a placeholder document for small/placeholder files."""
+        try:
+            # Read the placeholder content
+            with open(file_path, 'r', encoding='utf-8') as f:
+                placeholder_content = f.read().strip()
+            
+            # Create a single chunk with the placeholder content
+            chunk = TextChunk(
+                content=placeholder_content,
+                page_number=1,
+                chunk_index=0,
+                metadata={
+                    "is_placeholder": True,
+                    "original_file": file_path
+                }
+            )
+            
+            return ParsedDocument(
+                title=os.path.basename(file_path),
+                total_pages=1,
+                chunks=[chunk],
+                metadata={
+                    "parser": "placeholder",
+                    "file_size": os.path.getsize(file_path),
+                    "extraction_method": "placeholder_content",
+                    "is_placeholder": True
+                },
+                extraction_timestamp=datetime.now()
+            )
+        except Exception as e:
+            logger.error(f"Error creating placeholder document: {e}")
             return None
             
     def _parse_with_pymupdf(self, file_path: str) -> ParsedDocument:

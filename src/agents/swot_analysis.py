@@ -13,11 +13,13 @@ try:
     # Try relative imports first (when run as module)
     from ..tools.stock_data_tool import StockDataTool
     from ..tools.web_search_tool import WebSearchTool
+    from ..tools.openai_logger import openai_logger
     from ..graph.context_manager_mcp import MCPContextManager, ContextType
 except ImportError:
     # Fall back to absolute imports (when run as script)
     from tools.stock_data_tool import StockDataTool
     from tools.web_search_tool import WebSearchTool
+    from tools.openai_logger import openai_logger
     from graph.context_manager_mcp import MCPContextManager, ContextType
 
 logger = logging.getLogger(__name__)
@@ -93,7 +95,7 @@ class SWOTAnalysisAgent:
             financial_data = self._gather_financial_data(stock_symbol)
             
             # Step 2: Research market position
-            market_data = self._research_market_position(company_name, sector)
+            market_data = self._research_market_position(company_name, sector, stock_symbol)
             
             # Step 3: Analyze competitive landscape
             competitive_data = self._analyze_competitive_landscape(company_name, sector)
@@ -150,11 +152,11 @@ class SWOTAnalysisAgent:
             logger.error(f"Error gathering financial data: {e}")
             return {}
             
-    def _research_market_position(self, company_name: str, sector: str) -> Dict[str, Any]:
+    def _research_market_position(self, company_name: str, sector: str, stock_symbol: str) -> Dict[str, Any]:
         """Research company's market position."""
         try:
             # Search for company-specific news and analysis
-            company_news = self.web_search_tool.search_company_news(company_name)
+            company_news = self.web_search_tool.search_company_news(company_name, stock_symbol)
             
             # Search for sector analysis
             sector_news = self.web_search_tool.search_sector_news(sector)
@@ -176,9 +178,8 @@ class SWOTAnalysisAgent:
     def _analyze_competitive_landscape(self, company_name: str, sector: str) -> Dict[str, Any]:
         """Analyze competitive landscape."""
         try:
-            # Search for competitive analysis
-            competitive_query = f"{company_name} vs competitors {sector} market share analysis"
-            competitive_results = self.web_search_tool.search(competitive_query, max_results=5)
+            # Search for competitive analysis using sector news
+            competitive_results = self.web_search_tool.search_sector_news(f"{sector} competitive analysis {company_name}")
             
             competitive_data = {
                 "competitor_analysis": [result.title for result in competitive_results],
@@ -196,13 +197,11 @@ class SWOTAnalysisAgent:
     def _identify_market_insights(self, company_name: str, sector: str) -> Dict[str, Any]:
         """Identify market opportunities and threats."""
         try:
-            # Search for opportunities
-            opportunities_query = f"{company_name} growth opportunities {sector} market expansion"
-            opportunity_results = self.web_search_tool.search(opportunities_query, max_results=3)
+            # Search for opportunities using sector news
+            opportunity_results = self.web_search_tool.search_sector_news(f"{sector} growth opportunities {company_name}")
             
-            # Search for threats
-            threats_query = f"{company_name} challenges risks {sector} market threats"
-            threat_results = self.web_search_tool.search(threats_query, max_results=3)
+            # Search for threats using sector news
+            threat_results = self.web_search_tool.search_sector_news(f"{sector} challenges risks {company_name}")
             
             market_insights = {
                 "opportunities": [result.title for result in opportunity_results],
@@ -256,18 +255,40 @@ class SWOTAnalysisAgent:
             }}
             """
             
-            # Call OpenAI for analysis
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a senior business analyst specializing in SWOT analysis for investment decisions."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1000,
-                temperature=0.1
-            )
+            # Call OpenAI for analysis with logging
+            import time
+            start_time = time.time()
             
-            analysis_text = response.choices[0].message.content
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a senior business analyst specializing in SWOT analysis for investment decisions."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=1000,
+                    temperature=0.1
+                )
+                
+                duration_ms = int((time.time() - start_time) * 1000)
+                analysis_text = response.choices[0].message.content
+                
+                # Log the OpenAI completion
+                openai_logger.log_chat_completion(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a senior business analyst specializing in SWOT analysis for investment decisions."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response=analysis_text,
+                    usage=response.usage.__dict__ if response.usage else None,
+                    duration_ms=duration_ms,
+                    agent_name="SWOTAnalysisAgent"
+                )
+                
+            except Exception as api_error:
+                openai_logger.log_error(api_error, "gpt-4o-mini", "SWOTAnalysisAgent")
+                raise api_error
             
             # Parse JSON response
             import json

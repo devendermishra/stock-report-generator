@@ -1,6 +1,8 @@
 """
 Main entry point for Stock Report Generator.
 Provides a command-line interface for generating equity research reports.
+
+Copyright (c) 2025 Stock Report Generator. All rights reserved.
 """
 
 import asyncio

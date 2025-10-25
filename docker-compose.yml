@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  stock-report-generator:
+    build: .
+    container_name: stock-report-generator
+    volumes:
+      - ./reports:/app/reports
+      - ./data:/app/data
+      - ./temp:/app/temp
+    environment:
+      - PYTHONPATH=/app/src
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    command: python -m src.main

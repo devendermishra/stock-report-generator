@@ -10,6 +10,13 @@ from dataclasses import dataclass
 from datetime import datetime
 import json
 
+try:
+    # Try relative imports first (when run as module)
+    from ..tools.openai_logger import openai_logger
+except ImportError:
+    # Fall back to absolute imports (when run as script)
+    from tools.openai_logger import openai_logger
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -83,18 +90,40 @@ class SummarizerTool:
             # Prepare the prompt
             prompt = self._create_summarization_prompt(text, max_length, focus_areas)
             
-            # Call OpenAI API
-            response = openai.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_length * 2,  # Allow for structured output
-                temperature=0.1
-            )
+            # Call OpenAI API with logging
+            import time
+            start_time = time.time()
             
-            result_text = response.choices[0].message.content
+            try:
+                response = openai.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=max_length * 2,  # Allow for structured output
+                    temperature=0.1
+                )
+                
+                duration_ms = int((time.time() - start_time) * 1000)
+                result_text = response.choices[0].message.content
+                
+                # Log the OpenAI completion
+                openai_logger.log_chat_completion(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response=result_text,
+                    usage=response.usage.__dict__ if response.usage else None,
+                    duration_ms=duration_ms,
+                    agent_name="SummarizerTool"
+                )
+                
+            except Exception as api_error:
+                openai_logger.log_error(api_error, self.model, "SummarizerTool")
+                raise api_error
             
             # Parse the structured response
             summary_data = self._parse_summary_response(result_text)

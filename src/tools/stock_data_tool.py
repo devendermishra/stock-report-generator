@@ -6,61 +6,16 @@ Uses Yahoo Finance API for comprehensive stock analysis.
 import yfinance as yf
 import logging
 from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 import pandas as pd
 import time
 
+from .stock_data_models import StockMetrics, PriceData, CompanyInfo
+from .stock_data_calculator import StockDataCalculator
+from .stock_data_validator import StockDataValidator
+from ..exceptions import DataRetrievalError, ValidationError
+
 logger = logging.getLogger(__name__)
-
-@dataclass
-class StockMetrics:
-    """Represents key stock metrics and ratios."""
-    symbol: str
-    current_price: float
-    market_cap: float
-    pe_ratio: Optional[float]
-    pb_ratio: Optional[float]
-    eps: Optional[float]
-    dividend_yield: Optional[float]
-    beta: Optional[float]
-    volume: int
-    avg_volume: int
-    high_52w: float
-    low_52w: float
-    change_percent: float
-    last_updated: datetime
-    # Additional financial metrics
-    revenue_growth: Optional[float] = None
-    profit_growth: Optional[float] = None
-    roe: Optional[float] = None
-    roa: Optional[float] = None
-    ev_ebitda: Optional[float] = None
-    debt_to_equity: Optional[float] = None
-    current_ratio: Optional[float] = None
-    return_on_equity: Optional[float] = None
-    return_on_assets: Optional[float] = None
-
-@dataclass
-class PriceData:
-    """Represents historical price data."""
-    date: datetime
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
-
-@dataclass
-class CompanyInfo:
-    """Represents company information from NSE."""
-    symbol: str
-    company_name: str
-    sector: str
-    industry: str
-    market_cap: Optional[float] = None
-    isin: Optional[str] = None
-    listing_date: Optional[str] = None
 
 class StockDataTool:
     """
@@ -74,7 +29,8 @@ class StockDataTool:
         """
         Initialize the Stock Data Tool.
         """
-        pass
+        self.calculator = StockDataCalculator()
+        self.validator = StockDataValidator()
         
     def get_stock_metrics(self, symbol: str) -> Optional[StockMetrics]:
         """
@@ -125,13 +81,13 @@ class StockDataTool:
             change_percent = info.get('regularMarketChangePercent') or info.get('changePercent') or 0
             
             # Calculate additional financial metrics from multiple sources
-            revenue_growth = self._calculate_revenue_growth(ticker, info)
-            profit_growth = self._calculate_profit_growth(ticker, info)
-            roe = self._calculate_roe(ticker, info)
-            roa = self._calculate_roa(ticker, info)
-            ev_ebitda = self._calculate_ev_ebitda(ticker, info)
-            debt_to_equity = self._calculate_debt_to_equity(ticker, info)
-            current_ratio = self._calculate_current_ratio(ticker, info)
+            revenue_growth = self.calculator.calculate_revenue_growth(ticker, info)
+            profit_growth = self.calculator.calculate_profit_growth(ticker, info)
+            roe = self.calculator.calculate_roe(ticker, info)
+            roa = self.calculator.calculate_roa(ticker, info)
+            ev_ebitda = self.calculator.calculate_ev_ebitda(ticker, info)
+            debt_to_equity = self.calculator.calculate_debt_to_equity(ticker, info)
+            current_ratio = self.calculator.calculate_current_ratio(ticker, info)
             
             metrics = StockMetrics(
                 symbol=symbol,
@@ -382,66 +338,7 @@ class StockDataTool:
         Returns:
             CompanyInfo object with company name and sector
         """
-        try:
-            # First try yfinance
-            yf_symbol = f"{symbol}.NS" if not symbol.endswith('.NS') else symbol
-            ticker = yf.Ticker(yf_symbol)
-            info = ticker.info
-            
-            company_name = info.get('longName', '')
-            sector = info.get('sector', '')
-            industry = info.get('industry', '')
-            market_cap = info.get('marketCap')
-            
-            # Fix known sector mapping issues
-            sector_mapping = {
-                'TCS': 'Technology',
-                'INFY': 'Technology', 
-                'WIPRO': 'Technology',
-                'HCLTECH': 'Technology',
-                'TECHM': 'Technology',
-                'MINDTREE': 'Technology',
-                'LTTS': 'Technology',
-                'PERSISTENT': 'Technology',
-                'MPHASIS': 'Technology',
-                'COFORGE': 'Technology'
-            }
-            
-            if symbol in sector_mapping:
-                sector = sector_mapping[symbol]
-            
-            # If yfinance doesn't have the data, use fallback values
-            if not company_name or not sector:
-                logger.warning(f"Insufficient data from Yahoo Finance for {symbol}")
-            
-            # Fallback to symbol if no company name found
-            if not company_name:
-                company_name = symbol
-                
-            # Fallback to 'Unknown' if no sector found
-            if not sector:
-                sector = 'Unknown'
-                
-            company_info = CompanyInfo(
-                symbol=symbol,
-                company_name=company_name,
-                sector=sector,
-                industry=industry,
-                market_cap=market_cap
-            )
-            
-            logger.info(f"Retrieved company info: {company_name} ({sector})")
-            return company_info
-            
-        except Exception as e:
-            logger.error(f"Failed to get company name and sector for {symbol}: {e}")
-            # Return fallback info
-            return CompanyInfo(
-                symbol=symbol,
-                company_name=symbol,
-                sector='Unknown',
-                industry='Unknown'
-            )
+        return self.validator.get_company_name_and_sector(symbol)
             
             
     def validate_symbol(self, symbol: str) -> bool:
@@ -454,43 +351,7 @@ class StockDataTool:
         Returns:
             True if symbol is valid, False otherwise
         """
-        try:
-            # Clean the symbol
-            clean_symbol = symbol.upper().strip()
-            if not clean_symbol.endswith('.NS'):
-                yf_symbol = f"{clean_symbol}.NS"
-            else:
-                yf_symbol = clean_symbol
-                
-            logger.info(f"Validating symbol: {clean_symbol}")
-            
-            # Try to get basic info from yfinance
-            ticker = yf.Ticker(yf_symbol)
-            info = ticker.info
-            
-            # Check if we got valid data
-            if not info or len(info) < 5:  # Very basic info should have at least 5 fields
-                logger.warning(f"No data found for {clean_symbol}")
-                return False
-                
-            # Check for key indicators of a valid stock
-            has_price = info.get('currentPrice') is not None or info.get('regularMarketPrice') is not None
-            has_name = bool(info.get('longName') or info.get('shortName'))
-            has_market_cap = info.get('marketCap') is not None
-            
-            # At least one of these should be true for a valid stock
-            is_valid = has_price or has_name or has_market_cap
-            
-            if is_valid:
-                logger.info(f"Symbol {clean_symbol} is valid")
-                return True
-            else:
-                logger.warning(f"Symbol {clean_symbol} appears to be invalid - no price, name, or market cap data")
-                return False
-            
-        except Exception as e:
-            logger.error(f"Symbol validation failed for {clean_symbol}: {e}")
-            return False
+        return self.validator.validate_symbol(symbol)
             
     def validate_symbol_with_yahoo(self, symbol: str) -> bool:
         """
@@ -502,257 +363,5 @@ class StockDataTool:
         Returns:
             True if symbol is valid, False otherwise
         """
-        try:
-            clean_symbol = symbol.upper().strip()
-            logger.info(f"Validating {clean_symbol} with Yahoo Finance API")
-            
-            # Use Yahoo Finance validation
-            return self.validate_symbol(clean_symbol)
-                
-        except Exception as e:
-            logger.error(f"Yahoo Finance validation failed for {clean_symbol}: {e}")
-            return False
+        return self.validator.validate_symbol_with_yahoo(symbol)
     
-    def _calculate_revenue_growth(self, ticker, info: Dict[str, Any]) -> Optional[float]:
-        """Calculate revenue growth from multiple sources."""
-        try:
-            # Try to get from info first
-            revenue_growth = info.get('revenueGrowth') or info.get('revenueGrowthTTM') or info.get('revenueGrowthQuarterly')
-            if revenue_growth is not None:
-                return float(revenue_growth) * 100  # Convert to percentage
-            
-            # Try to calculate from financials
-            financials = ticker.financials
-            if not financials.empty:
-                # Try different revenue field names
-                revenue_fields = ['Total Revenue', 'Revenue', 'Net Sales', 'Sales']
-                for field in revenue_fields:
-                    if field in financials.index:
-                        revenue_data = financials.loc[field]
-                        if revenue_data is not None and len(revenue_data) >= 2:
-                            current_revenue = revenue_data.iloc[0]
-                            previous_revenue = revenue_data.iloc[1]
-                            if previous_revenue != 0:
-                                growth = ((current_revenue - previous_revenue) / abs(previous_revenue)) * 100
-                                return growth
-            
-            # Try quarterly data
-            quarterly = ticker.quarterly_financials
-            if not quarterly.empty:
-                revenue_fields = ['Total Revenue', 'Revenue', 'Net Sales', 'Sales']
-                for field in revenue_fields:
-                    if field in quarterly.index:
-                        revenue_data = quarterly.loc[field]
-                        if revenue_data is not None and len(revenue_data) >= 2:
-                            current_revenue = revenue_data.iloc[0]
-                            previous_revenue = revenue_data.iloc[1]
-                            if previous_revenue != 0:
-                                growth = ((current_revenue - previous_revenue) / abs(previous_revenue)) * 100
-                                return growth
-            
-            # Try to get from balance sheet
-            balance_sheet = ticker.balance_sheet
-            if not balance_sheet.empty:
-                revenue_fields = ['Total Revenue', 'Revenue', 'Net Sales', 'Sales']
-                for field in revenue_fields:
-                    if field in balance_sheet.index:
-                        revenue_data = balance_sheet.loc[field]
-                        if revenue_data is not None and len(revenue_data) >= 2:
-                            current_revenue = revenue_data.iloc[0]
-                            previous_revenue = revenue_data.iloc[1]
-                            if previous_revenue != 0:
-                                growth = ((current_revenue - previous_revenue) / abs(previous_revenue)) * 100
-                                return growth
-            
-            return None
-        except Exception as e:
-            logger.warning(f"Error calculating revenue growth: {e}")
-            return None
-    
-    def _calculate_profit_growth(self, ticker, info: Dict[str, Any]) -> Optional[float]:
-        """Calculate profit growth from multiple sources."""
-        try:
-            # Try to get from info first
-            profit_growth = info.get('earningsGrowth') or info.get('earningsGrowthTTM') or info.get('earningsGrowthQuarterly')
-            if profit_growth is not None:
-                return float(profit_growth) * 100  # Convert to percentage
-            
-            # Try to calculate from financials
-            financials = ticker.financials
-            if not financials.empty:
-                # Try different profit field names
-                profit_fields = ['Net Income', 'Net Income Common Stockholders', 'Net Earnings', 'Profit']
-                for field in profit_fields:
-                    if field in financials.index:
-                        net_income_data = financials.loc[field]
-                        if net_income_data is not None and len(net_income_data) >= 2:
-                            current_income = net_income_data.iloc[0]
-                            previous_income = net_income_data.iloc[1]
-                            if previous_income != 0:
-                                growth = ((current_income - previous_income) / abs(previous_income)) * 100
-                                return growth
-            
-            # Try quarterly data
-            quarterly = ticker.quarterly_financials
-            if not quarterly.empty:
-                profit_fields = ['Net Income', 'Net Income Common Stockholders', 'Net Earnings', 'Profit']
-                for field in profit_fields:
-                    if field in quarterly.index:
-                        net_income_data = quarterly.loc[field]
-                        if net_income_data is not None and len(net_income_data) >= 2:
-                            current_income = net_income_data.iloc[0]
-                            previous_income = net_income_data.iloc[1]
-                            if previous_income != 0:
-                                growth = ((current_income - previous_income) / abs(previous_income)) * 100
-                                return growth
-            
-            return None
-        except Exception as e:
-            logger.warning(f"Error calculating profit growth: {e}")
-            return None
-    
-    def _calculate_roe(self, ticker, info: Dict[str, Any]) -> Optional[float]:
-        """Calculate Return on Equity (ROE)."""
-        try:
-            # Try to get from info first
-            roe = info.get('returnOnEquity') or info.get('roe') or info.get('returnOnEquityTTM')
-            if roe is not None:
-                return float(roe) * 100  # Convert to percentage
-            
-            # Try to calculate from financials
-            financials = ticker.financials
-            if not financials.empty:
-                # Try different field names for net income and equity
-                net_income_fields = ['Net Income', 'Net Income Common Stockholders', 'Net Earnings', 'Profit']
-                equity_fields = ['Stockholders Equity', 'Total Stockholders Equity', 'Shareholders Equity', 'Total Equity']
-                
-                net_income = None
-                shareholders_equity = None
-                
-                for field in net_income_fields:
-                    if field in financials.index:
-                        net_income = financials.loc[field].iloc[0]
-                        break
-                
-                for field in equity_fields:
-                    if field in financials.index:
-                        shareholders_equity = financials.loc[field].iloc[0]
-                        break
-                
-                if net_income is not None and shareholders_equity is not None and shareholders_equity != 0:
-                    roe = (net_income / shareholders_equity) * 100
-                    return roe
-            
-            return None
-        except Exception as e:
-            logger.warning(f"Error calculating ROE: {e}")
-            return None
-    
-    def _calculate_roa(self, ticker, info: Dict[str, Any]) -> Optional[float]:
-        """Calculate Return on Assets (ROA)."""
-        try:
-            # Try to get from info first
-            roa = info.get('returnOnAssets') or info.get('roa') or info.get('returnOnAssetsTTM')
-            if roa is not None:
-                return float(roa) * 100  # Convert to percentage
-            
-            # Try to calculate from financials
-            financials = ticker.financials
-            if not financials.empty:
-                # Try different field names for net income and assets
-                net_income_fields = ['Net Income', 'Net Income Common Stockholders', 'Net Earnings', 'Profit']
-                assets_fields = ['Total Assets', 'Total Current Assets', 'Assets', 'Current Assets']
-                
-                net_income = None
-                total_assets = None
-                
-                for field in net_income_fields:
-                    if field in financials.index:
-                        net_income = financials.loc[field].iloc[0]
-                        break
-                
-                for field in assets_fields:
-                    if field in financials.index:
-                        total_assets = financials.loc[field].iloc[0]
-                        break
-                
-                if net_income is not None and total_assets is not None and total_assets != 0:
-                    roa = (net_income / total_assets) * 100
-                    return roa
-            
-            return None
-        except Exception as e:
-            logger.warning(f"Error calculating ROA: {e}")
-            return None
-
-    def _calculate_ev_ebitda(self, ticker, info: Dict[str, Any]) -> Optional[float]:
-        """Calculate EV/EBITDA ratio."""
-        try:
-            # Try to get from info first
-            ev_ebitda = info.get('evToEbitda') or info.get('ev_ebitda') or info.get('evToEbitdaTTM')
-            if ev_ebitda is not None:
-                return float(ev_ebitda)
-            
-            # Try to calculate from financials
-            financials = ticker.financials
-            if not financials.empty:
-                # Try different field names for EBITDA
-                ebitda_fields = ['EBITDA', 'Earnings Before Interest Taxes Depreciation Amortization', 'EBIT', 'Operating Income']
-                
-                ebitda = None
-                for field in ebitda_fields:
-                    if field in financials.index:
-                        ebitda = financials.loc[field].iloc[0]
-                        break
-                
-                if ebitda is not None and ebitda != 0:
-                    # Get market cap for EV calculation
-                    market_cap = info.get('marketCap') or info.get('market_cap')
-                    if market_cap is not None:
-                        ev_ebitda = market_cap / ebitda
-                        return ev_ebitda
-            
-            return None
-        except Exception as e:
-            logger.warning(f"Error calculating EV/EBITDA: {e}")
-            return None
-    
-    def _calculate_debt_to_equity(self, ticker, info: Dict[str, Any]) -> Optional[float]:
-        """Calculate Debt-to-Equity ratio."""
-        try:
-            # Try to get from info first
-            debt_to_equity = info.get('debtToEquity') or info.get('debtToEquityRatio')
-            if debt_to_equity is not None:
-                return float(debt_to_equity)
-            
-            # Try to calculate from financials
-            total_debt = info.get('totalDebt') or info.get('longTermDebt', 0)
-            shareholders_equity = info.get('totalStockholderEquity') or info.get('shareholdersEquity')
-            
-            if total_debt and shareholders_equity and shareholders_equity != 0:
-                return total_debt / shareholders_equity
-            
-            return None
-        except Exception as e:
-            logger.warning(f"Error calculating Debt-to-Equity: {e}")
-            return None
-    
-    def _calculate_current_ratio(self, ticker, info: Dict[str, Any]) -> Optional[float]:
-        """Calculate Current Ratio."""
-        try:
-            # Try to get from info first
-            current_ratio = info.get('currentRatio') or info.get('currentRatioQuarterly')
-            if current_ratio is not None:
-                return float(current_ratio)
-            
-            # Try to calculate from financials
-            current_assets = info.get('totalCurrentAssets') or info.get('currentAssets')
-            current_liabilities = info.get('totalCurrentLiabilities') or info.get('currentLiabilities')
-            
-            if current_assets and current_liabilities and current_liabilities != 0:
-                return current_assets / current_liabilities
-            
-            return None
-        except Exception as e:
-            logger.warning(f"Error calculating Current Ratio: {e}")
-            return None

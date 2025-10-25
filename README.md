@@ -64,7 +64,6 @@ User Input (Stock Symbol)
 ### Prerequisites
 - Python 3.10+
 - OpenAI API key
-- Tavily API key (for web search)
 
 ### Installation
 
@@ -195,8 +194,6 @@ OPENAI_API_KEY=your_openai_api_key
 # Note: TAVILY_API_KEY removed - now using free DuckDuckGo search
 
 # Optional
-ANTHROPIC_API_KEY=your_anthropic_api_key
-NSE_API_KEY=your_nse_api_key
 DEFAULT_MODEL=gpt-4o-mini
 OUTPUT_DIR=reports
 ```
@@ -367,17 +364,56 @@ Exports complete workflow data for analysis.
 
 ## 🤝 Contributing
 
+We welcome contributions to the Stock Report Generator! Please follow these guidelines:
+
+### Getting Started
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Add tests
-5. Submit a pull request
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+### Development Guidelines
+- Follow PEP 8 style guidelines
+- Add type hints to all functions
+- Include comprehensive docstrings
+- Write unit tests for new features
+- Update documentation as needed
+- Keep functions under 100 lines
+- Keep classes under 20 methods
+
+### Code Quality Standards
+- All functions must have type hints
+- All classes and functions must have docstrings
+- Functions should not exceed 100 lines
+- Classes should not exceed 20 methods
+- Scripts should not exceed 500 lines
+
+### Testing
+- Run unit tests: `python -m pytest tests/unit/`
+- Run integration tests: `python -m pytest tests/integration/`
+- Ensure test coverage is maintained
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🆘 Support
+## 📞 Support & Contact
+
+### Maintainer Contact Information
+- **GitHub**: [@devendermishra]
+- **Issues**: [GitHub Issues](https://github.com/devendermishra/stock-report-generator/issues)
+
+### Getting Help
+- Check the [documentation](docs/)
+- Search [existing issues](https://github.com/devendermishra/stock-report-generator/issues)
+- Create a [new issue](https://github.com/devendermishra/stock-report-generator/issues/new) for bugs or feature requests
+- Join our [discussions](https://github.com/devendermishra/stock-report-generator/discussions) for questions
+
+## 🆘 Troubleshooting
 
 For issues and questions:
 1. Check the logs in `stock_report_generator.log`

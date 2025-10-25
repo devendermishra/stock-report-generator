@@ -13,11 +13,13 @@ try:
     # Try relative imports first (when run as module)
     from ..tools.web_search_tool import WebSearchTool
     from ..tools.stock_data_tool import StockDataTool
+    from ..tools.openai_logger import openai_logger
     from ..graph.context_manager_mcp import MCPContextManager, ContextType
 except ImportError:
     # Fall back to absolute imports (when run as script)
     from tools.web_search_tool import WebSearchTool
     from tools.stock_data_tool import StockDataTool
+    from tools.openai_logger import openai_logger
     from graph.context_manager_mcp import MCPContextManager, ContextType
 
 logger = logging.getLogger(__name__)
@@ -335,19 +337,42 @@ class SectorResearcherAgent:
             }}
             """
             
-            # Call OpenAI for analysis
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a senior sector analyst with expertise in Indian equity markets."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1500,
-                temperature=0.1
-            )
+            # Call OpenAI for analysis with logging
+            import time
+            start_time = time.time()
+            
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a senior sector analyst with expertise in Indian equity markets."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=1500,
+                    temperature=0.1
+                )
+                
+                duration_ms = int((time.time() - start_time) * 1000)
+                analysis_text = response.choices[0].message.content
+                
+                # Log the OpenAI completion
+                openai_logger.log_chat_completion(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a senior sector analyst with expertise in Indian equity markets."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response=analysis_text,
+                    usage=response.usage.__dict__ if response.usage else None,
+                    duration_ms=duration_ms,
+                    agent_name="SectorResearcherAgent"
+                )
+                
+            except Exception as api_error:
+                openai_logger.log_error(api_error, "gpt-4o-mini", "SectorResearcherAgent")
+                raise api_error
             
             # Parse response
-            analysis_text = response.choices[0].message.content
             
             # Extract JSON from response
             import json

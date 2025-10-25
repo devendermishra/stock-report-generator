@@ -150,12 +150,10 @@ class WebSearchTool:
             elif days_back <= 30:
                 query += " site:nseindia.com OR site:livemint.com OR site:financialexpress.com"
             
-            # Perform search with DuckDuckGo
-            search_results = list(self.ddgs.text(
-                query,
-                max_results=self.max_results,
-                safesearch='moderate'
-            ))
+            logger.info(f"Performing search with query: {query}")
+            
+            # Perform search with DuckDuckGo with retry logic
+            search_results = self._search_with_retry(query)
             
             results = []
             for item in search_results:
@@ -186,6 +184,62 @@ class WebSearchTool:
         except Exception as e:
             logger.error(f"Search failed: {e}")
             return []
+    
+    def _search_with_retry(self, query: str, max_retries: int = 3) -> List[Dict[str, Any]]:
+        """
+        Perform search with retry logic to handle DDGS engine errors.
+        
+        Args:
+            query: Search query
+            max_retries: Maximum number of retry attempts
+            
+        Returns:
+            List of search results
+        """
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Search attempt {attempt + 1}/{max_retries} for query: {query}")
+                
+                # Try different engines if available
+                engines_to_try = ['google', 'bing', 'duckduckgo']
+                
+                for engine in engines_to_try:
+                    try:
+                        logger.info(f"Trying search engine: {engine}")
+                        search_results = list(self.ddgs.text(
+                            query,
+                            max_results=self.max_results,
+                            safesearch='moderate',
+                            backend=engine
+                        ))
+                        logger.info(f"Successfully got {len(search_results)} results using {engine}")
+                        return search_results
+                        
+                    except Exception as engine_error:
+                        logger.warning(f"Engine {engine} failed: {engine_error}")
+                        continue
+                
+                # If all engines fail, try default
+                logger.info("Trying default search engine")
+                search_results = list(self.ddgs.text(
+                    query,
+                    max_results=self.max_results,
+                    safesearch='moderate'
+                ))
+                return search_results
+                
+            except Exception as e:
+                logger.warning(f"Search attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    # Wait before retry
+                    import time
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                else:
+                    logger.error(f"All search attempts failed for query: {query}")
+                    return []
+        
+        return []
             
     def _extract_date_from_content(self, content: str) -> Optional[str]:
         """

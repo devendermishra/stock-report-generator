@@ -5,40 +5,16 @@ Handles report formatting, consistency checking, and final output generation.
 
 import logging
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
 from datetime import datetime
 import re
 import os
 
+from .report_formatter_models import ReportSection, ConsistencyIssue, FormattedReport
+from .report_formatter_utils import ReportFormatterUtils
+from .technical_analysis_formatter import TechnicalAnalysisFormatter
+from ..exceptions import ReportGenerationError
+
 logger = logging.getLogger(__name__)
-
-@dataclass
-class ReportSection:
-    """Represents a section of the final report."""
-    title: str
-    content: str
-    level: int
-    order: int
-    metadata: Dict[str, Any]
-
-@dataclass
-class ConsistencyIssue:
-    """Represents a consistency issue found in the report."""
-    issue_type: str
-    description: str
-    severity: str
-    location: str
-    suggestion: str
-
-@dataclass
-class FormattedReport:
-    """Represents a formatted report."""
-    title: str
-    sections: List[ReportSection]
-    metadata: Dict[str, Any]
-    markdown_content: str
-    word_count: int
-    creation_timestamp: datetime
 
 class ReportFormatterTool:
     """
@@ -50,31 +26,11 @@ class ReportFormatterTool:
     
     def _format_market_cap(self, market_cap: Any) -> str:
         """Format market cap in a readable format."""
-        if not market_cap or market_cap == 'N/A':
-            return 'N/A'
-        
-        try:
-            # Convert to float if it's a string
-            if isinstance(market_cap, str):
-                market_cap = float(market_cap)
-            
-            # Convert to crores (divide by 1e7)
-            market_cap_cr = market_cap / 1e7
-            
-            if market_cap_cr >= 100000:  # 1 lakh crores
-                return f"{market_cap_cr/100000:.1f}L Cr"
-            elif market_cap_cr >= 1000:  # 1 thousand crores
-                return f"{market_cap_cr/1000:.1f}K Cr"
-            else:
-                return f"{market_cap_cr:.1f} Cr"
-        except (ValueError, TypeError):
-            return 'N/A'
+        return self.utils.format_market_cap(market_cap)
     
     def _get_recommendation_summary(self, stock_summary: Dict[str, Any], sector_summary: Dict[str, Any], management_summary: Dict[str, Any]) -> str:
         """Get a concise recommendation summary."""
-        # Determine recommendation from analysis
-        recommendation_data = self._determine_recommendation(sector_summary, stock_summary, management_summary)
-        return f"**{recommendation_data['rating']}** - {recommendation_data['rationale']}"
+        return self.utils.get_recommendation_summary(stock_summary, sector_summary, management_summary)
     
     def _get_management_outlook_summary(self, management_summary: Dict[str, Any]) -> str:
         """Get a concise management outlook summary."""
@@ -216,7 +172,7 @@ class ReportFormatterTool:
             rsi = indicators.get('rsi')
             if rsi is not None:
                 rsi_signal = self._get_rsi_signal(rsi)
-                analysis_parts.append(f"- **RSI:** {rsi:.1f} ({rsi_signal})")
+                analysis_parts.append(f"- **RSI:** {rsi:.2f} ({rsi_signal})")
             
             # Bollinger Bands
             bb_upper = indicators.get('bb_upper')
@@ -244,8 +200,8 @@ class ReportFormatterTool:
                 # Calculate potential upside/downside
                 upside_potential = ((resistance - current) / current) * 100
                 downside_risk = ((current - support) / current) * 100
-                analysis_parts.append(f"- **Upside Potential:** {upside_potential:.1f}% to resistance")
-                analysis_parts.append(f"- **Downside Risk:** {downside_risk:.1f}% to support")
+                analysis_parts.append(f"- **Upside Potential:** {upside_potential:.2f}% to resistance")
+                analysis_parts.append(f"- **Downside Risk:** {downside_risk:.2f}% to support")
         
         # Momentum
         if momentum is not None:
@@ -344,6 +300,8 @@ class ReportFormatterTool:
             output_dir: Directory to save formatted reports
         """
         self.output_dir = output_dir
+        self.utils = ReportFormatterUtils()
+        self.technical_formatter = TechnicalAnalysisFormatter()
         os.makedirs(output_dir, exist_ok=True)
         
     def format_report(
@@ -660,8 +618,8 @@ class ReportFormatterTool:
 ### Stock Price Summary
 - **Current Price:** ₹{current_price:.2f}
 - **52-Week Range:** ₹{low_52w:.2f} - ₹{high_52w:.2f}
-- **Price vs 52W High:** {price_to_52w_high:.1f}% of 52-week high
-- **Price vs 52W Low:** {price_to_52w_low:.1f}% of 52-week low
+- **Price vs 52W High:** {price_to_52w_high:.2f}% of 52-week high
+- **Price vs 52W Low:** {price_to_52w_low:.2f}% of 52-week low
 - **Daily Change:** {change_percent:+.2f}%
 
 ### Key Valuation Metrics
@@ -1234,7 +1192,7 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
                 
                 if largest_market_cap > 0 and second_largest_market_cap > 0:
                     dominance_ratio = largest_market_cap / second_largest_market_cap
-                    analysis_parts.append(f"\n**Market Dominance:** Leader has {dominance_ratio:.1f}x the market cap of second-largest competitor")
+                    analysis_parts.append(f"\n**Market Dominance:** Leader has {dominance_ratio:.2f}x the market cap of second-largest competitor")
             
             return '\n'.join(analysis_parts)
         else:
