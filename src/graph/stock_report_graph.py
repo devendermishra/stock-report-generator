@@ -141,39 +141,19 @@ class StockReportGraph:
         self.graph = self._build_graph()
         
     def _build_graph(self) -> StateGraph:
-        """Build the LangGraph workflow."""
+        """Build the LangGraph workflow with parallel execution support."""
         # Create the state graph
         workflow = StateGraph(WorkflowState)
         
         # Add nodes for each agent
-        workflow.add_node("sector_researcher", self._sector_research_node)
-        workflow.add_node("stock_researcher", self._stock_research_node)
-        workflow.add_node("management_analysis", self._management_analysis_node)
+        workflow.add_node("parallel_analysis", self._parallel_analysis_node)
         workflow.add_node("swot_analysis", self._swot_analysis_node)
         workflow.add_node("report_reviewer", self._report_reviewer_node)
         
-        # Add conditional edges
+        # Add conditional edges for parallel execution
         workflow.add_conditional_edges(
-            "sector_researcher",
-            self._should_continue_after_sector,
-            {
-                "continue": "stock_researcher",
-                "error": END
-            }
-        )
-        
-        workflow.add_conditional_edges(
-            "stock_researcher",
-            self._should_continue_after_stock,
-            {
-                "continue": "management_analysis",
-                "error": END
-            }
-        )
-        
-        workflow.add_conditional_edges(
-            "management_analysis",
-            self._should_continue_after_management,
+            "parallel_analysis",
+            self._should_continue_after_parallel,
             {
                 "continue": "swot_analysis",
                 "error": END
@@ -192,7 +172,7 @@ class StockReportGraph:
         workflow.add_edge("report_reviewer", END)
         
         # Set entry point
-        workflow.set_entry_point("sector_researcher")
+        workflow.set_entry_point("parallel_analysis")
         
         # Compile the graph
         return workflow.compile()
@@ -222,7 +202,7 @@ class StockReportGraph:
                 stock_symbol=stock_symbol,
                 company_name=company_name,
                 sector=sector,
-                current_step="sector_researcher",
+                current_step="parallel_analysis",
                 start_time=datetime.now()
             )
             
@@ -298,6 +278,143 @@ class StockReportGraph:
                 "errors": [str(e)]
             }
             
+    async def _parallel_analysis_node(self, state: WorkflowState) -> WorkflowState:
+        """Execute parallel analysis for sector, stock, and management research."""
+        try:
+            logger.info(f"Starting parallel analysis for {state.stock_symbol}")
+            
+            # Create tasks for parallel execution
+            tasks = [
+                self._execute_sector_research(state),
+                self._execute_stock_research(state),
+                self._execute_management_analysis(state)
+            ]
+            
+            # Execute all tasks in parallel
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results
+            sector_result, stock_result, management_result = results
+            
+            # Handle sector research result
+            if isinstance(sector_result, Exception):
+                logger.error(f"Sector research failed: {sector_result}")
+                state.errors.append(f"Sector research failed: {str(sector_result)}")
+            else:
+                state.sector_analysis = sector_result
+                
+            # Handle stock research result
+            if isinstance(stock_result, Exception):
+                logger.error(f"Stock research failed: {stock_result}")
+                state.errors.append(f"Stock research failed: {str(stock_result)}")
+            else:
+                state.stock_analysis = stock_result
+                
+            # Handle management analysis result
+            if isinstance(management_result, Exception):
+                logger.error(f"Management analysis failed: {management_result}")
+                state.errors.append(f"Management analysis failed: {str(management_result)}")
+            else:
+                state.management_analysis = management_result
+            
+            # Determine next step based on results
+            if state.errors:
+                state.current_step = "error"
+            else:
+                state.current_step = "swot_analysis"
+                
+            logger.info(f"Completed parallel analysis for {state.stock_symbol}")
+            
+        except Exception as e:
+            logger.error(f"Error in parallel analysis: {e}")
+            state.errors.append(f"Parallel analysis failed: {str(e)}")
+            state.current_step = "error"
+            
+        return state
+    
+    async def _execute_sector_research(self, state: WorkflowState) -> Dict[str, Any]:
+        """Execute sector research analysis asynchronously."""
+        try:
+            logger.info(f"Executing sector research for {state.stock_symbol}")
+            
+            # Perform sector analysis
+            sector_analysis = await self.sector_researcher.analyze_sector(
+                stock_symbol=state.stock_symbol,
+                company_name=state.company_name,
+                sector=state.sector
+            )
+            
+            return {
+                "sector_name": sector_analysis.sector_name,
+                "summary": sector_analysis.summary,
+                "trends": sector_analysis.trends,
+                "peer_comparison": sector_analysis.peer_comparison,
+                "regulatory_environment": sector_analysis.regulatory_environment,
+                "outlook": sector_analysis.outlook,
+                "risks": sector_analysis.risks,
+                "opportunities": sector_analysis.opportunities,
+                "confidence_score": sector_analysis.confidence_score
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in sector research: {e}")
+            raise e
+    
+    async def _execute_stock_research(self, state: WorkflowState) -> Dict[str, Any]:
+        """Execute stock research analysis asynchronously."""
+        try:
+            logger.info(f"Executing stock research for {state.stock_symbol}")
+            
+            # Perform stock analysis
+            stock_analysis = await self.stock_researcher.analyze_stock(
+                stock_symbol=state.stock_symbol,
+                company_name=state.company_name
+            )
+            
+            return {
+                "symbol": stock_analysis.symbol,
+                "current_price": stock_analysis.current_price,
+                "market_cap": stock_analysis.market_cap,
+                "financial_metrics": stock_analysis.financial_metrics,
+                "technical_analysis": stock_analysis.technical_analysis,
+                "valuation_metrics": stock_analysis.valuation_metrics,
+                "performance_summary": stock_analysis.performance_summary,
+                "investment_rating": stock_analysis.investment_rating,
+                "target_price": stock_analysis.target_price,
+                "confidence_score": stock_analysis.confidence_score
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in stock research: {e}")
+            raise e
+    
+    async def _execute_management_analysis(self, state: WorkflowState) -> Dict[str, Any]:
+        """Execute management analysis asynchronously."""
+        try:
+            logger.info(f"Executing management analysis for {state.stock_symbol}")
+            
+            # Perform management analysis
+            management_analysis = await self.management_analysis.analyze_management(
+                stock_symbol=state.stock_symbol,
+                company_name=state.company_name
+            )
+            
+            return {
+                "company_name": management_analysis.company_name,
+                "summary": management_analysis.summary,
+                "strategic_initiatives": management_analysis.strategic_initiatives,
+                "growth_opportunities": management_analysis.growth_opportunities,
+                "risk_factors": management_analysis.risk_factors,
+                "management_outlook": management_analysis.management_outlook,
+                "key_insights": management_analysis.key_insights,
+                "financial_highlights": management_analysis.financial_highlights,
+                "confidence_score": management_analysis.confidence_score
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in management analysis: {e}")
+            raise e
+
     def _sector_research_node(self, state: WorkflowState) -> WorkflowState:
         """Execute sector research analysis."""
         try:
@@ -468,6 +585,12 @@ class StockReportGraph:
             state.current_step = "error"
             
         return state
+        
+    def _should_continue_after_parallel(self, state: WorkflowState) -> str:
+        """Determine if workflow should continue after parallel analysis."""
+        if state.current_step == "error" or len(state.errors) > 0:
+            return "error"
+        return "continue"
         
     def _should_continue_after_sector(self, state: WorkflowState) -> str:
         """Determine if workflow should continue after sector research."""

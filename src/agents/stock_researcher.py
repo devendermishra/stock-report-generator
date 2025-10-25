@@ -68,7 +68,7 @@ class StockResearcherAgent:
         self.stock_data_tool = stock_data_tool
         self.openai_client = openai.OpenAI(api_key=openai_api_key)
         
-    def analyze_stock(
+    async def analyze_stock(
         self,
         stock_symbol: str,
         company_name: str

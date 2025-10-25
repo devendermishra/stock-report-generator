@@ -76,7 +76,7 @@ class ManagementAnalysisAgent:
         self.summarizer_tool = summarizer_tool
         self.openai_client = openai.OpenAI(api_key=openai_api_key)
         
-    def analyze_management(
+    async def analyze_management(
         self,
         stock_symbol: str,
         company_name: str
