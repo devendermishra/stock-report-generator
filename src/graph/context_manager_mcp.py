@@ -4,10 +4,9 @@ Manages shared memory and context between agents in the LangGraph workflow.
 """
 
 from typing import Dict, Any, List, Optional
-import json
 import logging
 from datetime import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import Enum
 
 logger = logging.getLogger(__name__)

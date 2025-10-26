@@ -4,10 +4,7 @@ Contains methods for validating stock symbols and data quality.
 """
 
 import logging
-from typing import Dict, Any, Optional
-
 from .stock_data_models import CompanyInfo
-from ..exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ Contains dataclasses and type definitions for report-related data structures.
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 
 @dataclass

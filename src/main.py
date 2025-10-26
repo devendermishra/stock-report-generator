@@ -65,11 +65,8 @@ class StockReportGenerator:
         self.mcp_context = None
         self.workflow_graph = None
         self.tools = {}
-        
-        # Initialize the system
-        if not self.initialize():
-            raise RuntimeError("Failed to initialize Stock Report Generator")
-        
+
+
     def initialize(self) -> bool:
         """
         Initialize the system components.

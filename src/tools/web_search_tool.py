@@ -6,9 +6,8 @@ Uses DuckDuckGo search as a free and open-source alternative to Tavily API.
 import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-import time
 import re
+from langchain_core.tools import tool
 
 try:
     from ddgs import DDGS
@@ -26,6 +25,314 @@ class SearchResult:
     content: str
     published_date: Optional[str] = None
     relevance_score: Optional[float] = None
+
+# Initialize DDGS
+_ddgs = DDGS() if DDGS else None
+_max_results = 10
+
+@tool(
+    description="Search for sector-specific news and market trends from Indian financial markets. Returns recent news articles, analysis, and market insights for a given sector. Useful for understanding sector performance and trends.",
+    infer_schema=True,
+    parse_docstring=True,
+    error_on_invalid_docstring=False
+)
+def search_sector_news(sector: str, days_back: int = 7, include_analysis: bool = True) -> Dict[str, Any]:
+    """
+    Search for sector-specific news and trends.
+    
+    Args:
+        sector: Sector name (e.g., "Banking", "IT", "Pharmaceuticals")
+        days_back: Number of days to look back for news
+        include_analysis: Whether to include analysis and opinion pieces
+    """
+    try:
+        if not _ddgs:
+            return {"error": "DuckDuckGo search not available. Install ddgs package."}
+        
+        # Build query with time-based keywords
+        time_keywords = _get_time_keywords(days_back)
+        query = f"{sector} sector news India NSE market trends {time_keywords}"
+        
+        if include_analysis:
+            query += " analysis outlook"
+            
+        logger.info(f"Searching for sector news: {query}")
+        
+        # Perform search with retry logic
+        search_results = _search_with_retry(query, max_retries=3)
+        
+        if not search_results:
+            return {"error": "No search results found"}
+        
+        # Process results and filter by date if possible
+        results = []
+        filtered_results = _filter_results_by_date(search_results, days_back)
+        
+        for result in filtered_results[:_max_results]:
+            search_result = SearchResult(
+                title=result.get('title', ''),
+                url=result.get('href', ''),
+                content=result.get('body', ''),
+                published_date=result.get('date', None),
+                relevance_score=None
+            )
+            results.append(search_result.__dict__)
+        
+        return {
+            "query": query,
+            "sector": sector,
+            "days_back": days_back,
+            "time_keywords": time_keywords,
+            "results": results,
+            "total_results": len(results),
+            "search_timestamp": logger.info("Search completed successfully")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in sector news search: {e}")
+        return {"error": f"Search failed: {str(e)}"}
+
+@tool(
+    description="Search for company-specific news, announcements, earnings reports, and corporate updates from Indian financial markets. Returns recent news articles and press releases for a specific company and stock symbol.",
+    infer_schema=True,
+    parse_docstring=True,
+    error_on_invalid_docstring=False
+)
+def search_company_news(company_name: str, stock_symbol: str, days_back: int = 7) -> Dict[str, Any]:
+    """
+    Search for company-specific news and announcements.
+    
+    Args:
+        company_name: Full company name
+        stock_symbol: NSE stock symbol
+        days_back: Number of days to look back for news
+    """
+    try:
+        if not _ddgs:
+            return {"error": "DuckDuckGo search not available. Install ddgs package."}
+        
+        # Build query with time-based keywords
+        time_keywords = _get_time_keywords(days_back)
+        query = f"{company_name} {stock_symbol} news India NSE announcements {time_keywords}"
+        
+        logger.info(f"Searching for company news: {query}")
+        
+        # Perform search with retry logic
+        search_results = _search_with_retry(query, max_retries=3)
+        
+        if not search_results:
+            return {"error": "No search results found"}
+        
+        # Process results and filter by date if possible
+        results = []
+        filtered_results = _filter_results_by_date(search_results, days_back)
+        
+        for result in filtered_results[:_max_results]:
+            search_result = SearchResult(
+                title=result.get('title', ''),
+                url=result.get('href', ''),
+                content=result.get('body', ''),
+                published_date=result.get('date', None),
+                relevance_score=None
+            )
+            results.append(search_result.__dict__)
+        
+        return {
+            "query": query,
+            "company_name": company_name,
+            "stock_symbol": stock_symbol,
+            "days_back": days_back,
+            "time_keywords": time_keywords,
+            "results": results,
+            "total_results": len(results),
+            "search_timestamp": logger.info("Search completed successfully")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in company news search: {e}")
+        return {"error": f"Search failed: {str(e)}"}
+
+@tool(
+    description="Search for general market trends, economic analysis, and financial market insights from Indian markets. Use this for broad market research, economic indicators, and trend analysis.",
+    infer_schema=True,
+    parse_docstring=True,
+    error_on_invalid_docstring=False
+)
+def search_market_trends(query: str, max_results: int = 10) -> Dict[str, Any]:
+    """
+    Search for general market trends and analysis.
+    
+    Args:
+        query: Search query for market trends
+        max_results: Maximum number of results to return
+    """
+    try:
+        if not _ddgs:
+            return {"error": "DuckDuckGo search not available. Install ddgs package."}
+        
+        # Enhance query for market trends
+        enhanced_query = f"{query} India NSE market analysis trends"
+        
+        logger.info(f"Searching for market trends: {enhanced_query}")
+        
+        # Perform search with retry logic
+        search_results = _search_with_retry(enhanced_query, max_retries=3)
+        
+        if not search_results:
+            return {"error": "No search results found"}
+        
+        # Process results
+        results = []
+        for result in search_results[:max_results]:
+            search_result = SearchResult(
+                title=result.get('title', ''),
+                url=result.get('href', ''),
+                content=result.get('body', ''),
+                published_date=result.get('date', None),
+                relevance_score=None
+            )
+            results.append(search_result.__dict__)
+        
+        return {
+            "query": enhanced_query,
+            "original_query": query,
+            "results": results,
+            "total_results": len(results),
+            "search_timestamp": logger.info("Search completed successfully")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in market trends search: {e}")
+        return {"error": f"Search failed: {str(e)}"}
+
+def _get_time_keywords(days_back: int) -> str:
+    """
+    Convert days_back parameter into search-friendly time keywords.
+    
+    Args:
+        days_back: Number of days to look back
+        
+    Returns:
+        String with time-based search keywords
+    """
+    if days_back <= 1:
+        return "today yesterday"
+    elif days_back <= 3:
+        return "last 3 days recent"
+    elif days_back <= 7:
+        return "last week recent"
+    elif days_back <= 14:
+        return "last 2 weeks recent"
+    elif days_back <= 30:
+        return "last month recent"
+    elif days_back <= 90:
+        return "last 3 months recent"
+    else:
+        return "recent latest"
+
+def _filter_results_by_date(search_results: List[Dict[str, Any]], days_back: int) -> List[Dict[str, Any]]:
+    """
+    Filter search results by date when possible.
+    
+    Args:
+        search_results: List of search results
+        days_back: Number of days to look back
+        
+    Returns:
+        Filtered list of search results
+    """
+    try:
+        from datetime import datetime, timedelta
+        
+        # Calculate cutoff date
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        filtered_results = []
+        for result in search_results:
+            # Try to parse the date if available
+            result_date = result.get('date')
+            if result_date:
+                try:
+                    # Try different date formats
+                    parsed_date = None
+                    for date_format in ['%Y-%m-%d', '%Y-%m-%d %H:%M:%S', '%d/%m/%Y', '%m/%d/%Y']:
+                        try:
+                            parsed_date = datetime.strptime(str(result_date), date_format)
+                            break
+                        except ValueError:
+                            continue
+                    
+                    # If we can parse the date, check if it's within the range
+                    if parsed_date and parsed_date >= cutoff_date:
+                        filtered_results.append(result)
+                    elif parsed_date is None:
+                        # If we can't parse the date, include it anyway
+                        filtered_results.append(result)
+                except Exception:
+                    # If date parsing fails, include the result anyway
+                    filtered_results.append(result)
+            else:
+                # If no date available, include the result
+                filtered_results.append(result)
+        
+        # If no results after filtering, return original results
+        return filtered_results if filtered_results else search_results
+        
+    except Exception as e:
+        logger.warning(f"Date filtering failed: {e}. Returning all results.")
+        return search_results
+
+def _search_with_retry(query: str, max_retries: int = 3) -> List[Dict[str, Any]]:
+    """
+    Perform search with retry logic to handle DDGS engine errors.
+    
+    Args:
+        query: Search query
+        max_retries: Maximum number of retry attempts
+        
+    Returns:
+        List of search results
+    """
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Search attempt {attempt + 1}/{max_retries} for query: {query}")
+            
+            # Try different engines if available
+            engines_to_try = ['google', 'bing', 'duckduckgo']
+            
+            for engine in engines_to_try:
+                try:
+                    logger.info(f"Trying search engine: {engine}")
+                    search_results = list(_ddgs.text(
+                        query,
+                        max_results=_max_results,
+                        safesearch='moderate',
+                        backend=engine
+                    ))
+                    logger.info(f"Successfully got {len(search_results)} results using {engine}")
+                    return search_results
+                    
+                except Exception as engine_error:
+                    logger.warning(f"Engine {engine} failed: {engine_error}")
+                    continue
+            
+            # If all engines fail, try default
+            logger.info("Trying default search engine")
+            search_results = list(_ddgs.text(
+                query,
+                max_results=_max_results,
+                safesearch='moderate'
+            ))
+            return search_results
+            
+        except Exception as e:
+            logger.warning(f"Search attempt {attempt + 1} failed: {e}")
+            if attempt == max_retries - 1:
+                logger.error(f"All search attempts failed for query: {query}")
+                return []
+            continue
+    
+    return []
 
 class WebSearchTool:
     """

@@ -4,7 +4,7 @@ Specializes in comprehensive SWOT analysis for investment decision making.
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from dataclasses import dataclass
 from datetime import datetime
 import openai
