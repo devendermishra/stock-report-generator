@@ -7,8 +7,8 @@ import openai
 import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from datetime import datetime
 import json
+from langchain_core.tools import tool
 
 try:
     # Try relative imports first (when run as module)
@@ -37,6 +37,268 @@ class InsightExtraction:
     categories: Dict[str, List[str]]
     sentiment_analysis: Dict[str, Any]
     key_metrics: Dict[str, Any]
+
+# Global configuration
+_api_key = None
+_model = "gpt-4o-mini"
+
+def initialize_summarizer(api_key: str, model: str = "gpt-4o-mini"):
+    """Initialize the summarizer with API key and model."""
+    global _api_key, _model
+    _api_key = api_key
+    _model = model
+    openai.api_key = api_key
+
+@tool(
+    description="Summarize financial documents, reports, and text content with AI-powered analysis. Extracts key points, sentiment, and insights. Perfect for processing earnings reports, analyst notes, and financial documents.",
+    infer_schema=True,
+    parse_docstring=True,
+    error_on_invalid_docstring=False
+)
+def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    Summarize a given text with focus on specific areas.
+    
+    Args:
+        text: Text to summarize
+        max_length: Maximum length of summary
+        focus_areas: Optional list of focus areas (e.g., ['financial', 'strategic'])
+    """
+    try:
+        if not _api_key:
+            return {"error": "Summarizer not initialized. Call initialize_summarizer() first."}
+        
+        if not text.strip():
+            return {
+                "original_text": text,
+                "summary": "",
+                "key_points": [],
+                "sentiment": "neutral",
+                "confidence": 0.0,
+                "word_count": 0,
+                "summary_ratio": 0.0,
+                "error": "Empty text provided"
+            }
+        
+        # Prepare the prompt
+        prompt = _create_summarization_prompt(text, max_length, focus_areas)
+        
+        # Call OpenAI API with logging
+        import time
+        start_time = time.time()
+        
+        try:
+            response = openai.chat.completions.create(
+                model=_model,
+                messages=[
+                    {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=max_length * 2,  # Allow for structured output
+                temperature=0.1
+            )
+            
+            duration_ms = int((time.time() - start_time) * 1000)
+            result_text = response.choices[0].message.content
+            
+            # Log the OpenAI completion
+            openai_logger.log_chat_completion(
+                model=_model,
+                messages=[
+                    {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
+                    {"role": "user", "content": prompt}
+                ],
+                response=result_text,
+                usage=response.usage.__dict__ if response.usage else None,
+                duration_ms=duration_ms,
+                agent_name="SummarizerTool"
+            )
+            
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {api_error}")
+            return {
+                "original_text": text,
+                "summary": "",
+                "key_points": [],
+                "sentiment": "neutral",
+                "confidence": 0.0,
+                "word_count": len(text.split()),
+                "summary_ratio": 0.0,
+                "error": f"API error: {str(api_error)}"
+            }
+        
+        # Parse the structured response
+        try:
+            result_data = json.loads(result_text)
+        except json.JSONDecodeError:
+            # Fallback to simple text parsing
+            result_data = {
+                "summary": result_text,
+                "key_points": [],
+                "sentiment": "neutral",
+                "confidence": 0.8
+            }
+        
+        # Calculate metrics
+        word_count = len(text.split())
+        summary_word_count = len(result_data.get("summary", "").split())
+        summary_ratio = summary_word_count / word_count if word_count > 0 else 0
+        
+        return {
+            "original_text": text,
+            "summary": result_data.get("summary", ""),
+            "key_points": result_data.get("key_points", []),
+            "sentiment": result_data.get("sentiment", "neutral"),
+            "confidence": result_data.get("confidence", 0.8),
+            "word_count": word_count,
+            "summary_ratio": summary_ratio
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in text summarization: {e}")
+        return {
+            "original_text": text,
+            "summary": "",
+            "key_points": [],
+            "sentiment": "neutral",
+            "confidence": 0.0,
+            "word_count": len(text.split()) if text else 0,
+            "summary_ratio": 0.0,
+            "error": f"Summarization failed: {str(e)}"
+        }
+
+@tool(
+    description="Extract key insights, metrics, and structured information from financial documents and text. Categorizes insights by type (financial, strategic, operational) and provides sentiment analysis. Ideal for analyzing earnings calls, reports, and financial statements.",
+    infer_schema=True,
+    parse_docstring=True,
+    error_on_invalid_docstring=False
+)
+def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    Extract insights and key information from text.
+    
+    Args:
+        text: Text to analyze
+        categories: Optional list of categories to focus on
+    """
+    try:
+        if not _api_key:
+            return {"error": "Summarizer not initialized. Call initialize_summarizer() first."}
+        
+        if not text.strip():
+            return {
+                "insights": [],
+                "categories": {},
+                "sentiment_analysis": {},
+                "key_metrics": {},
+                "error": "Empty text provided"
+            }
+        
+        # Prepare the prompt
+        prompt = _create_insight_extraction_prompt(text, categories)
+        
+        # Call OpenAI API
+        try:
+            response = openai.chat.completions.create(
+                model=_model,
+                messages=[
+                    {"role": "system", "content": "You are a financial analyst expert at extracting insights from documents."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.1
+            )
+            
+            result_text = response.choices[0].message.content
+            
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {api_error}")
+            return {
+                "insights": [],
+                "categories": {},
+                "sentiment_analysis": {},
+                "key_metrics": {},
+                "error": f"API error: {str(api_error)}"
+            }
+        
+        # Parse the structured response
+        try:
+            result_data = json.loads(result_text)
+        except json.JSONDecodeError:
+            # Fallback to simple parsing
+            result_data = {
+                "insights": [result_text],
+                "categories": {},
+                "sentiment_analysis": {"sentiment": "neutral", "confidence": 0.5},
+                "key_metrics": {}
+            }
+        
+        return {
+            "insights": result_data.get("insights", []),
+            "categories": result_data.get("categories", {}),
+            "sentiment_analysis": result_data.get("sentiment_analysis", {}),
+            "key_metrics": result_data.get("key_metrics", {})
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in insight extraction: {e}")
+        return {
+            "insights": [],
+            "categories": {},
+            "sentiment_analysis": {},
+            "key_metrics": {},
+            "error": f"Insight extraction failed: {str(e)}"
+        }
+
+def _create_summarization_prompt(text: str, max_length: int, focus_areas: Optional[List[str]] = None) -> str:
+    """Create a prompt for text summarization."""
+    focus_instruction = ""
+    if focus_areas:
+        focus_instruction = f" Focus on these areas: {', '.join(focus_areas)}."
+    
+    return f"""
+Please summarize the following text in approximately {max_length} words.{focus_instruction}
+
+Text to summarize:
+{text}
+
+Please provide your response in the following JSON format:
+{{
+    "summary": "Your summary here",
+    "key_points": ["point1", "point2", "point3"],
+    "sentiment": "positive/negative/neutral",
+    "confidence": 0.8
+}}
+"""
+
+def _create_insight_extraction_prompt(text: str, categories: Optional[List[str]] = None) -> str:
+    """Create a prompt for insight extraction."""
+    category_instruction = ""
+    if categories:
+        category_instruction = f" Focus on these categories: {', '.join(categories)}."
+    
+    return f"""
+Please extract insights and key information from the following text.{category_instruction}
+
+Text to analyze:
+{text}
+
+Please provide your response in the following JSON format:
+{{
+    "insights": ["insight1", "insight2", "insight3"],
+    "categories": {{
+        "financial": ["metric1", "metric2"],
+        "strategic": ["strategy1", "strategy2"]
+    }},
+    "sentiment_analysis": {{
+        "sentiment": "positive/negative/neutral",
+        "confidence": 0.8
+    }},
+    "key_metrics": {{
+        "metric_name": "value"
+    }}
+}}
+"""
 
 class SummarizerTool:
     """

@@ -6,7 +6,6 @@ Handles report formatting, consistency checking, and final output generation.
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-import re
 import os
 import random
 import numpy as np
@@ -19,7 +18,6 @@ from .report_formatter_models import ReportSection, ConsistencyIssue, FormattedR
 from .report_formatter_utils import ReportFormatterUtils
 from .report_formatter_helpers import FinancialFormatter, TechnicalFormatter, PeerAnalysisFormatter, SWOTFormatter
 from .technical_analysis_formatter import TechnicalAnalysisFormatter
-from ..exceptions import ReportGenerationError
 
 logger = logging.getLogger(__name__)
 

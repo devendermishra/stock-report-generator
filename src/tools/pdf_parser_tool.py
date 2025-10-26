@@ -6,7 +6,7 @@ Handles PDF parsing, text extraction, and content chunking for analysis.
 import PyPDF2
 import fitz  # PyMuPDF
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 import re
 import os

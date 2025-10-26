@@ -15,9 +15,7 @@ class Config:
     
     # API Keys
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-    # Note: TAVILY_API_KEY removed - now using DuckDuckGo search (free, no API key required)
-    
+
     # Yahoo Finance API Configuration (no API key required)
     YAHOO_FINANCE_BASE_URL = "https://query1.finance.yahoo.com"
     
@@ -43,8 +41,6 @@ class Config:
         """Validate that all required configuration is present."""
         validation = {
             "openai_key": bool(cls.OPENAI_API_KEY),
-            "anthropic_key": bool(cls.ANTHROPIC_API_KEY),
-            # Note: tavily_key removed - DuckDuckGo search doesn't require API key
         }
         return validation
     

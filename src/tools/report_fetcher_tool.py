@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime
 import os
 import time
-from urllib.parse import urljoin, urlparse
 
 logger = logging.getLogger(__name__)
 

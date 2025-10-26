@@ -5,10 +5,6 @@ Contains methods for calculating financial metrics and ratios.
 
 import logging
 from typing import Dict, Any, Optional
-import pandas as pd
-
-from .stock_data_models import StockMetrics, PriceData
-from ..exceptions import DataRetrievalError
 
 logger = logging.getLogger(__name__)
 

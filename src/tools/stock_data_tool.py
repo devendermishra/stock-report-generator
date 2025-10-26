@@ -8,17 +8,197 @@ All rights reserved.
 
 import yfinance as yf
 import logging
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional
+from datetime import datetime
 import pandas as pd
-import time
+from langchain_core.tools import tool
 
 from .stock_data_models import StockMetrics, PriceData, CompanyInfo
 from .stock_data_calculator import StockDataCalculator
 from .stock_data_validator import StockDataValidator
-from ..exceptions import DataRetrievalError, ValidationError
 
 logger = logging.getLogger(__name__)
+
+# Initialize calculator and validator
+_calculator = StockDataCalculator()
+_validator = StockDataValidator()
+
+@tool(
+    description="Get comprehensive stock metrics including current price, market cap, P/E ratio, volume, and other financial indicators for NSE stocks. Automatically adds .NS suffix if not provided.",
+    infer_schema=True,
+    parse_docstring=True,
+    error_on_invalid_docstring=False
+)
+def get_stock_metrics(symbol: str) -> Dict[str, Any]:
+    """
+    Get comprehensive stock metrics for a given symbol.
+    
+    Args:
+        symbol: NSE stock symbol (e.g., 'RELIANCE' or 'RELIANCE.NS')
+    """
+    try:
+        # Ensure .NS suffix for NSE stocks
+        if not symbol.endswith('.NS'):
+            symbol = f"{symbol}.NS"
+            
+        logger.info(f"Fetching stock metrics for {symbol}")
+        
+        # Get stock data
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        # Validate symbol exists
+        if not info or 'symbol' not in info:
+            logger.error(f"Symbol {symbol} not found")
+            return {"error": f"Symbol {symbol} not found"}
+        
+        # Get current price data
+        hist = stock.history(period="1d")
+        if hist.empty:
+            logger.error(f"No price data available for {symbol}")
+            return {"error": f"No price data available for {symbol}"}
+        
+        current_price = hist['Close'].iloc[-1]
+        
+        # Calculate metrics
+        metrics = _calculator.calculate_metrics(stock, info, current_price)
+        
+        # Validate metrics
+        validation_result = _validator.validate_metrics(metrics)
+        if not validation_result.is_valid:
+            logger.warning(f"Validation issues for {symbol}: {validation_result.issues}")
+        
+        # Format response
+        result = {
+            "symbol": symbol,
+            "company_name": info.get('longName', 'Unknown'),
+            "sector": info.get('sector', 'Unknown'),
+            "current_price": float(current_price),
+            "market_cap": info.get('marketCap'),
+            "pe_ratio": info.get('trailingPE'),
+            "pb_ratio": info.get('priceToBook'),
+            "dividend_yield": info.get('dividendYield'),
+            "52_week_high": info.get('fiftyTwoWeekHigh'),
+            "52_week_low": info.get('fiftyTwoWeekLow'),
+            "volume": int(hist['Volume'].iloc[-1]),
+            "avg_volume": int(hist['Volume'].mean()),
+            "beta": info.get('beta'),
+            "currency": info.get('currency', 'INR'),
+            "exchange": info.get('exchange', 'NSE'),
+            "timestamp": datetime.now().isoformat(),
+            "validation_issues": validation_result.issues if not validation_result.is_valid else []
+        }
+        
+        logger.info(f"Successfully retrieved metrics for {symbol}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching stock metrics for {symbol}: {e}")
+        return {"error": f"Failed to fetch stock metrics: {str(e)}"}
+
+@tool(
+    description="Get detailed company information including business description, sector, industry, website, employee count, and location for NSE stocks. Useful for understanding company background and business model.",
+    infer_schema=True,
+    parse_docstring=True,
+    error_on_invalid_docstring=False
+)
+def get_company_info(symbol: str) -> Dict[str, Any]:
+    """
+    Get company information for a given stock symbol.
+    
+    Args:
+        symbol: NSE stock symbol (e.g., 'RELIANCE' or 'RELIANCE.NS')
+    """
+    try:
+        # Ensure .NS suffix for NSE stocks
+        if not symbol.endswith('.NS'):
+            symbol = f"{symbol}.NS"
+            
+        logger.info(f"Fetching company info for {symbol}")
+        
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        if not info or 'symbol' not in info:
+            return {"error": f"Symbol {symbol} not found"}
+        
+        result = {
+            "symbol": symbol,
+            "company_name": info.get('longName', 'Unknown'),
+            "short_name": info.get('shortName', 'Unknown'),
+            "sector": info.get('sector', 'Unknown'),
+            "industry": info.get('industry', 'Unknown'),
+            "description": info.get('longBusinessSummary', 'No description available'),
+            "website": info.get('website', ''),
+            "employees": info.get('fullTimeEmployees'),
+            "city": info.get('city', ''),
+            "state": info.get('state', ''),
+            "country": info.get('country', 'India'),
+            "currency": info.get('currency', 'INR'),
+            "exchange": info.get('exchange', 'NSE'),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        logger.info(f"Successfully retrieved company info for {symbol}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching company info for {symbol}: {e}")
+        return {"error": f"Failed to fetch company info: {str(e)}"}
+
+@tool(
+    description="Validate if a stock symbol exists and is accessible on NSE. Checks symbol availability and returns company details if valid. Use this before fetching detailed metrics to avoid errors.",
+    infer_schema=True,
+    parse_docstring=True,
+    error_on_invalid_docstring=False
+)
+def validate_symbol(symbol: str) -> Dict[str, Any]:
+    """
+    Validate if a stock symbol exists and is accessible.
+    
+    Args:
+        symbol: NSE stock symbol (e.g., 'RELIANCE' or 'RELIANCE.NS')
+    """
+    try:
+        # Ensure .NS suffix for NSE stocks
+        if not symbol.endswith('.NS'):
+            symbol = f"{symbol}.NS"
+            
+        logger.info(f"Validating symbol {symbol}")
+        
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        if not info or 'symbol' not in info:
+            return {
+                "valid": False,
+                "symbol": symbol,
+                "error": "Symbol not found"
+            }
+        
+        # Try to get recent price data
+        hist = stock.history(period="1d")
+        if hist.empty:
+            return {
+                "valid": False,
+                "symbol": symbol,
+                "error": "No price data available"
+            }
+        
+        return {
+            "valid": True,
+            "symbol": symbol,
+            "company_name": info.get('longName', 'Unknown'),
+            "sector": info.get('sector', 'Unknown')
+        }
+        
+    except Exception as e:
+        logger.error(f"Error validating symbol {symbol}: {e}")
+        return {
+            "valid": False,
+            "symbol": symbol,
+            "error": f"Validation failed: {str(e)}"
+        }
 
 class StockDataTool:
     """

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import asyncio
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph.state import CompiledStateGraph
 
 try:
     # Try relative imports first (when run as module)
@@ -140,7 +140,7 @@ class StockReportGraph:
         # Build the graph
         self.graph = self._build_graph()
         
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self) -> CompiledStateGraph[Any, Any, Any, Any]:
         """Build the LangGraph workflow with parallel execution support."""
         # Create the state graph
         workflow = StateGraph(WorkflowState)
@@ -278,7 +278,7 @@ class StockReportGraph:
                 "errors": [str(e)]
             }
             
-    async def _parallel_analysis_node(self, state: WorkflowState) -> WorkflowState:
+    async def _parallel_analysis_node(self, state: WorkflowState) -> dict:
         """Execute parallel analysis for sector, stock, and management research."""
         try:
             logger.info(f"Starting parallel analysis for {state.stock_symbol}")
@@ -296,41 +296,47 @@ class StockReportGraph:
             # Process results
             sector_result, stock_result, management_result = results
             
+            # Prepare state changes
+            state_changes = {}
+            errors = []
+            
             # Handle sector research result
             if isinstance(sector_result, Exception):
                 logger.error(f"Sector research failed: {sector_result}")
-                state.errors.append(f"Sector research failed: {str(sector_result)}")
+                errors.append(f"Sector research failed: {str(sector_result)}")
             else:
-                state.sector_analysis = sector_result
+                state_changes["sector_analysis"] = sector_result
                 
             # Handle stock research result
             if isinstance(stock_result, Exception):
                 logger.error(f"Stock research failed: {stock_result}")
-                state.errors.append(f"Stock research failed: {str(stock_result)}")
+                errors.append(f"Stock research failed: {str(stock_result)}")
             else:
-                state.stock_analysis = stock_result
+                state_changes["stock_analysis"] = stock_result
                 
             # Handle management analysis result
             if isinstance(management_result, Exception):
                 logger.error(f"Management analysis failed: {management_result}")
-                state.errors.append(f"Management analysis failed: {str(management_result)}")
+                errors.append(f"Management analysis failed: {str(management_result)}")
             else:
-                state.management_analysis = management_result
+                state_changes["management_analysis"] = management_result
             
-            # Determine next step based on results
-            if state.errors:
-                state.current_step = "error"
+            # Add errors to state changes
+            if errors:
+                state_changes["errors"] = state.errors + errors
+                state_changes["current_step"] = "error"
             else:
-                state.current_step = "swot_analysis"
+                state_changes["current_step"] = "swot_analysis"
                 
             logger.info(f"Completed parallel analysis for {state.stock_symbol}")
+            return state_changes
             
         except Exception as e:
             logger.error(f"Error in parallel analysis: {e}")
-            state.errors.append(f"Parallel analysis failed: {str(e)}")
-            state.current_step = "error"
-            
-        return state
+            return {
+                "errors": state.errors + [f"Parallel analysis failed: {str(e)}"],
+                "current_step": "error"
+            }
     
     async def _execute_sector_research(self, state: WorkflowState) -> Dict[str, Any]:
         """Execute sector research analysis asynchronously."""
@@ -519,7 +525,7 @@ class StockReportGraph:
             
         return state
         
-    def _swot_analysis_node(self, state: WorkflowState) -> WorkflowState:
+    def _swot_analysis_node(self, state: WorkflowState) -> dict:
         """Execute SWOT analysis."""
         try:
             logger.info(f"Executing SWOT analysis for {state.stock_symbol}")
@@ -531,28 +537,31 @@ class StockReportGraph:
                 sector=state.sector
             )
             
-            # Update state
-            state.swot_analysis = {
-                "company_name": swot_analysis.company_name,
-                "strengths": swot_analysis.strengths,
-                "weaknesses": swot_analysis.weaknesses,
-                "opportunities": swot_analysis.opportunities,
-                "threats": swot_analysis.threats,
-                "summary": swot_analysis.summary,
-                "confidence_score": swot_analysis.confidence_score
+            # Return state changes
+            state_changes = {
+                "swot_analysis": {
+                    "company_name": swot_analysis.company_name,
+                    "strengths": swot_analysis.strengths,
+                    "weaknesses": swot_analysis.weaknesses,
+                    "opportunities": swot_analysis.opportunities,
+                    "threats": swot_analysis.threats,
+                    "summary": swot_analysis.summary,
+                    "confidence_score": swot_analysis.confidence_score
+                },
+                "current_step": "report_reviewer"
             }
             
-            state.current_step = "report_reviewer"
             logger.info(f"Completed SWOT analysis for {state.stock_symbol}")
+            return state_changes
             
         except Exception as e:
             logger.error(f"Error in SWOT analysis: {e}")
-            state.errors.append(f"SWOT analysis failed: {str(e)}")
-            state.current_step = "error"
-            
-        return state
+            return {
+                "errors": state.errors + [f"SWOT analysis failed: {str(e)}"],
+                "current_step": "error"
+            }
         
-    def _report_reviewer_node(self, state: WorkflowState) -> WorkflowState:
+    def _report_reviewer_node(self, state: WorkflowState) -> dict:
         """Execute final report generation."""
         try:
             logger.info(f"Executing final report generation for {state.stock_symbol}")
@@ -563,28 +572,31 @@ class StockReportGraph:
                 company_name=state.company_name
             )
             
-            # Update state
-            state.final_report = {
-                "stock_symbol": final_report.stock_symbol,
-                "company_name": final_report.company_name,
-                "report_content": final_report.report_content,
-                "sections": final_report.sections,
-                "data_sources": final_report.data_sources,
-                "confidence_score": final_report.confidence_score,
-                "consistency_issues": [issue.__dict__ for issue in final_report.consistency_issues],
-                "recommendations": final_report.recommendations,
-                "created_at": final_report.created_at.isoformat()
+            # Return state changes
+            state_changes = {
+                "final_report": {
+                    "stock_symbol": final_report.stock_symbol,
+                    "company_name": final_report.company_name,
+                    "report_content": final_report.report_content,
+                    "sections": final_report.sections,
+                    "data_sources": final_report.data_sources,
+                    "confidence_score": final_report.confidence_score,
+                    "consistency_issues": [issue.__dict__ for issue in final_report.consistency_issues],
+                    "recommendations": final_report.recommendations,
+                    "created_at": final_report.created_at.isoformat()
+                },
+                "current_step": "completed"
             }
             
-            state.current_step = "completed"
             logger.info(f"Completed final report generation for {state.stock_symbol}")
+            return state_changes
             
         except Exception as e:
             logger.error(f"Error in final report generation: {e}")
-            state.errors.append(f"Final report generation failed: {str(e)}")
-            state.current_step = "error"
-            
-        return state
+            return {
+                "errors": state.errors + [f"Final report generation failed: {str(e)}"],
+                "current_step": "error"
+            }
         
     def _should_continue_after_parallel(self, state: WorkflowState) -> str:
         """Determine if workflow should continue after parallel analysis."""
