@@ -128,7 +128,7 @@ class StockReportGenerator:
             
             # Summarizer Tool
             self.tools['summarizer'] = SummarizerTool(
-                api_key=self.config.OPENAI_API_KEY,
+                openai_api_key=self.config.OPENAI_API_KEY,
                 model=self.config.DEFAULT_MODEL
             )
             
@@ -149,13 +149,7 @@ class StockReportGenerator:
         try:
             self.workflow_graph = StockReportGraph(
                 mcp_context=self.mcp_context,
-                web_search_tool=self.tools['web_search'],
-                stock_data_tool=self.tools['stock_data'],
-                report_fetcher_tool=self.tools['report_fetcher'],
-                pdf_parser_tool=self.tools['pdf_parser'],
-                summarizer_tool=self.tools['summarizer'],
-                report_formatter_tool=self.tools['report_formatter'],
-                openai_api_key=self.config.OPENAI_API_KEY
+                tools=self.tools
             )
             logger.info("Workflow graph initialized successfully")
             
@@ -197,39 +191,23 @@ class StockReportGenerator:
         try:
             logger.info(f"Starting traditional report generation for {stock_symbol}")
             
-            # Get company name and sector automatically
-            logger.info(f"Fetching company information for {stock_symbol}")
-            try:
-                company_info = self.tools['stock_data'].get_company_name_and_sector(stock_symbol)
-                company_name = company_info.company_name
-                sector = company_info.sector
-            except Exception as e:
-                logger.warning(f"Could not get company info: {e}")
-                company_name = stock_symbol
-                sector = "Unknown"
-            
-            logger.info(f"Found: {company_name} in {sector} sector")
-            
             # Execute the workflow
-            result = await self.workflow_graph.run_workflow(stock_symbol, company_name, sector)
+            result = await self.workflow_graph.execute_workflow(stock_symbol)
             
-            if result.get("final_report") and not result.get("errors"):
+            if result.get("success", False):
                 logger.info(f"Traditional report generated successfully for {stock_symbol}")
                 return {
                     "success": True,
                     "stock_symbol": stock_symbol,
-                    "company_name": company_name,
-                    "sector": sector,
                     "report_type": "traditional",
                     "generated_at": datetime.now().isoformat(),
-                    "report_path": result.get("final_report", {}).get("report_path"),
                     **result
                 }
             else:
                 logger.error(f"Traditional report generation failed for {stock_symbol}")
                 return {
                     "success": False,
-                    "error": result.get("errors", ["Unknown error"])[0] if result.get("errors") else "Unknown error",
+                    "error": result.get("error", "Unknown error"),
                     "stock_symbol": stock_symbol
                 }
                 
@@ -291,22 +269,6 @@ class StockReportGenerator:
                 logger.warning(f"LangGraph recommendations failed: {recommendations_result.get('error', 'Unknown error')}")
                 # Continue with analysis results only
             
-            # Get structured data from analysis
-            structured_data = analysis_result.get("structured_data", {})
-            
-            # Also parse recommendations for additional structured data
-            if recommendations_result.get("success", False):
-                recommendations_text = recommendations_result.get("recommendations", "")
-                if recommendations_text:
-                    recommendations_structured = self.langgraph_agent._parse_structured_analysis(recommendations_text)
-                    logger.debug(f"Recommendations structured data: {recommendations_structured}")
-                    # Merge recommendations structured data (it's more likely to have the final ratings)
-                    for key, value in recommendations_structured.items():
-                        if value != "N/A" and value != []:
-                            structured_data[key] = value
-                            logger.debug(f"Merged {key}: {value}")
-                    logger.debug(f"Final merged structured data: {structured_data}")
-            
             # Format the report
             report_data = {
                 "stock_symbol": stock_symbol,
@@ -314,7 +276,6 @@ class StockReportGenerator:
                 "sector": sector,
                 "analysis": analysis_result.get("analysis", ""),
                 "recommendations": recommendations_result.get("recommendations", ""),
-                "structured_data": structured_data,
                 "agent_id": self.langgraph_agent.agent_id,
                 "report_type": "langgraph",
                 "generated_at": datetime.now().isoformat()
@@ -334,17 +295,17 @@ class StockReportGenerator:
             logger.info(f"LangGraph report saved to {markdown_filename}")
             
             # Generate PDF report
-            pdf_filename = f"stock_report_{stock_symbol}_{timestamp}.pdf"
-            pdf_result = self.tools['pdf_generator'].generate_pdf(
+            pdf_filename = f"reports/stock_report_{stock_symbol}_{timestamp}.pdf"
+            pdf_result = await self.tools['pdf_generator'].generate_pdf(
                 markdown_content=markdown_content,
-                output_filename=pdf_filename,
-                stock_symbol=stock_symbol
+                output_path=pdf_filename,
+                title=f"LangGraph Stock Analysis Report - {stock_symbol}"
             )
             
-            if pdf_result:
-                logger.info(f"LangGraph PDF report generated: {pdf_result}")
+            if pdf_result.get("success", False):
+                logger.info(f"LangGraph PDF report generated: {pdf_filename}")
             else:
-                logger.warning(f"Failed to generate PDF")
+                logger.warning(f"Failed to generate PDF: {pdf_result.get('error', 'Unknown error')}")
             
             return {
                 "success": True,
@@ -353,10 +314,9 @@ class StockReportGenerator:
                 "sector": sector,
                 "report_type": "langgraph",
                 "markdown_file": markdown_filename,
-                "pdf_file": pdf_result if pdf_result else None,
+                "pdf_file": pdf_filename if pdf_result.get("success", False) else None,
                 "analysis": analysis_result.get("analysis", ""),
                 "recommendations": recommendations_result.get("recommendations", ""),
-                "structured_data": structured_data,
                 "generated_at": datetime.now().isoformat()
             }
             
@@ -370,17 +330,6 @@ class StockReportGenerator:
     
     def _format_langgraph_report(self, report_data: Dict[str, Any]) -> str:
         """Format LangGraph report data into markdown."""
-        structured_data = report_data.get('structured_data', {})
-        
-        # Format key strengths and risks
-        strengths_text = ""
-        if structured_data.get('key_strengths'):
-            strengths_text = "\n".join([f"- {strength}" for strength in structured_data['key_strengths']])
-        
-        risks_text = ""
-        if structured_data.get('key_risks'):
-            risks_text = "\n".join([f"- {risk}" for risk in structured_data['key_risks']])
-        
         return f"""# LangGraph Stock Analysis Report
 
 ## 📊 Stock Information
@@ -390,26 +339,11 @@ class StockReportGenerator:
 - **Analysis Type**: LangGraph LLM-Driven Analysis
 - **Generated**: {report_data['generated_at']}
 
-## 🎯 Investment Summary
-- **Investment Rating**: {structured_data.get('investment_rating', 'N/A')}
-- **Confidence Score**: {structured_data.get('confidence_score', 'N/A')}/10
-- **Market Sentiment**: {structured_data.get('market_sentiment', 'N/A')}
-- **Target Price**: {structured_data.get('target_price', 'N/A')}
-
-## 🔍 Detailed Analysis
+## 🔍 Analysis
 {report_data['analysis']}
 
-## 🎯 Investment Recommendations
+## 🎯 Recommendations
 {report_data['recommendations']}
-
-## 💪 Key Strengths
-{strengths_text if strengths_text else "Not specified"}
-
-## ⚠️ Key Risks
-{risks_text if risks_text else "Not specified"}
-
-## 📈 Peer Comparison
-{structured_data.get('peer_comparison', 'Not available')}
 
 ---
 *Report generated by LangGraph Stock Analysis System*
@@ -462,137 +396,6 @@ class StockReportGenerator:
                 "success": False,
                 "error": str(e)
             }
-    
-    def print_langgraph_workflow(self, format_type: str = "ascii"):
-        """Print LangGraph workflow visualization using LangGraph's built-in visualization methods."""
-        try:
-            if not self.langgraph_agent:
-                print("❌ LangGraph agent not initialized")
-                return
-            
-            print("🤖 LangGraph Dynamic Agent Workflow Visualization:")
-            print("=" * 60)
-            print()
-            
-            # Get the compiled graph from the agent
-            # Note: The current implementation uses LangChain's create_agent which doesn't directly expose a graph
-            # We'll need to create a proper LangGraph workflow to use the visualization features
-            print("⚠️  Note: Current LangGraph agent uses LangChain's create_agent() which doesn't expose graph visualization.")
-            print("    To use graph.get_graph().draw_ascii() and draw_mermaid(), we need a proper LangGraph workflow.")
-            print()
-            
-            # For now, show the traditional workflow description
-            print("📊 Current LangGraph Agent Architecture:")
-            print("    ├── LangGraphDynamicAgentSimple class")
-            print("    ├── create_agent() from langchain.agents")
-            print("    ├── ChatOpenAI LLM integration")
-            print("    ├── 5 LangChain tools (@tool decorators)")
-            print("    └── MCPContextManager for shared memory")
-            print()
-            
-            print("🔄 Execution Flow:")
-            print("    Input: Stock Symbol")
-            print("    ↓")
-            print("    analyze_stock() → agent.invoke() → Tool Selection & Execution")
-            print("    ↓")
-            print("    generate_recommendations() → agent.invoke() → Final Analysis")
-            print("    ↓")
-            print("    Output: Structured Investment Report")
-            print()
-            
-            print("🛠️  Available Tools:")
-            print("    • get_stock_data(symbol) - Financial metrics")
-            print("    • get_company_info(symbol) - Company profile")
-            print("    • search_web(query) - Market research")
-            print("    • summarize_text(text) - AI summarization")
-            print("    • get_peer_comparison(symbol) - Industry analysis")
-            print()
-            
-            print("💡 To enable proper graph visualization, consider migrating to a full LangGraph workflow")
-            print("    with StateGraph instead of LangChain's create_agent().")
-            
-        except Exception as e:
-            print(f"❌ Error printing LangGraph workflow: {e}")
-    
-    def print_agent_workflow_graph(self, format_type: str = "ascii"):
-        """Print default agent workflow graph using LangGraph's built-in visualization methods."""
-        try:
-            if not self.workflow_graph:
-                print("❌ Default workflow graph not initialized")
-                return
-            
-            print("🏗️  Traditional Multi-Agent Workflow Visualization:")
-            print("=" * 60)
-            print()
-            
-            # Use LangGraph's built-in visualization
-            try:
-                if format_type.lower() == "mermaid":
-                    print("📊 Mermaid Diagram:")
-                    print("-" * 40)
-                    mermaid_diagram = self.workflow_graph.get_graph().draw_mermaid()
-                    print(mermaid_diagram)
-                    print("-" * 40)
-                else:
-                    print("📊 ASCII Diagram:")
-                    print("-" * 40)
-                    ascii_diagram = self.workflow_graph.get_graph().draw_ascii()
-                    print(ascii_diagram)
-                    print("-" * 40)
-                
-                print()
-                print("🔧 Graph Details:")
-                print(f"    • Graph Type: {type(self.workflow_graph).__name__}")
-                print(f"    • Nodes: {len(self.workflow_graph.get_graph().nodes)}")
-                print(f"    • Edges: {len(self.workflow_graph.get_graph().edges)}")
-                print()
-                
-            except Exception as viz_error:
-                print(f"⚠️  Could not generate {format_type} visualization: {viz_error}")
-                print("    Falling back to text description...")
-                print()
-                
-                # Fallback to text description
-                print("📊 Workflow Structure:")
-                print("    Input: Stock Symbol")
-                print("    ↓")
-                print("    parallel_analysis (Sector + Stock + Management)")
-                print("    ↓")
-                print("    swot_analysis")
-                print("    ↓")
-                print("    report_reviewer")
-                print("    ↓")
-                print("    Output: Comprehensive Stock Report")
-                print()
-            
-            print("🛠️  Agent Classes:")
-            print("    • SectorResearcherAgent - analyze_sector() method")
-            print("    • StockResearcherAgent - analyze_stock() method")
-            print("    • ManagementAnalysisAgent - analyze_management() method")
-            print("    • SWOTAnalysisAgent - analyze_swot() method")
-            print("    • ReportReviewerAgent - review_report() method")
-            print()
-            
-            print("🛠️  Tool Classes:")
-            print("    • StockDataTool - get_stock_metrics(), get_company_info()")
-            print("    • WebSearchTool - search_sector_news(), search_company_news()")
-            print("    • ReportFetcherTool - fetch_reports()")
-            print("    • PDFParserTool - parse_pdf()")
-            print("    • SummarizerTool - summarize()")
-            print("    • ReportFormatterTool - format_report(), generate_final_report()")
-            print("    • PDFGeneratorTool - generate_pdf()")
-            print()
-            
-            print("🎯 Key Features:")
-            print("    • Fixed-sequence multi-agent pipeline")
-            print("    • Parallel agent execution for efficiency")
-            print("    • Specialized agent roles with dedicated methods")
-            print("    • State-based workflow management")
-            print("    • Comprehensive sector & management analysis")
-            print("    • Quality review & validation process")
-            
-        except Exception as e:
-            print(f"❌ Error printing agent workflow graph: {e}")
 
 async def main():
     """Main function for command-line interface."""
@@ -607,15 +410,12 @@ Examples:
   python main.py --symbol INFY --output-dir my_reports
   python main.py --symbol RELIANCE --langgraph
   python main.py --symbol TCS --langgraph --verbose
-  python main.py --print-langgraph
-  python main.py --print-agent-graph
-  python main.py --print-agent-graph --format mermaid
-  python main.py --print-langgraph --format ascii
         """
     )
     
     parser.add_argument(
         "--symbol",
+        required=True,
         help="NSE stock symbol (e.g., RELIANCE, TCS, HDFCBANK) - company name and sector will be fetched automatically"
     )
     
@@ -643,31 +443,7 @@ Examples:
         help="Use LangGraph framework for intelligent tool execution (default)"
     )
     
-    parser.add_argument(
-        "--print-langgraph",
-        action="store_true",
-        help="Print LangGraph workflow visualization"
-    )
-    
-    parser.add_argument(
-        "--print-agent-graph",
-        action="store_true",
-        help="Print default agent workflow graph"
-    )
-    
-    parser.add_argument(
-        "--format",
-        choices=["ascii", "mermaid"],
-        default="ascii",
-        help="Visualization format for graph printing (default: ascii)"
-    )
-    
     args = parser.parse_args()
-    
-    # Validate arguments
-    if not args.print_langgraph and not args.print_agent_graph:
-        if not args.symbol:
-            parser.error("--symbol is required when not printing graphs")
     
     # Set logging level
     if args.verbose:
@@ -679,21 +455,6 @@ Examples:
     if not generator.initialize():
         logger.error("Failed to initialize Stock Report Generator")
         sys.exit(1)
-    
-    # Handle graph printing requests
-    if args.print_langgraph:
-        print("\n🔍 LangGraph Workflow Visualization:")
-        print("=" * 50)
-        generator.print_langgraph_workflow(format_type=args.format)
-        print("=" * 50)
-        return
-    
-    if args.print_agent_graph:
-        print("\n🔍 Default Agent Workflow Graph:")
-        print("=" * 50)
-        generator.print_agent_workflow_graph(format_type=args.format)
-        print("=" * 50)
-        return
         
     try:
         # Generate the report
@@ -731,14 +492,9 @@ Examples:
             
             # Show additional info for LangGraph reports
             if report_type == 'langgraph':
-                structured_data = result.get('structured_data', {})
-                print(f"🎯 Investment Rating: {structured_data.get('investment_rating', 'N/A')}")
-                print(f"🎯 Confidence Score: {structured_data.get('confidence_score', 'N/A')}")
-                print(f"📊 Market Sentiment: {structured_data.get('market_sentiment', 'N/A')}")
-                if structured_data.get('target_price', 'N/A') != 'N/A':
-                    print(f"💰 Target Price: {structured_data.get('target_price', 'N/A')}")
-                if structured_data.get('peer_comparison', 'N/A') != 'N/A':
-                    print(f"📈 Peer Comparison: Available in report")
+                print(f"🎯 Investment Rating: N/A")
+                print(f"🎯 Confidence Score: N/A")
+                print(f"📊 Market Sentiment: N/A")
             
             # Export data if requested
             if args.export_data:
@@ -764,3 +520,4 @@ Examples:
 
 if __name__ == "__main__":
     asyncio.run(main())
+
