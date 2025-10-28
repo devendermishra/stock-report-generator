@@ -20,6 +20,9 @@ class ContextType(Enum):
     FINAL_REPORT = "final_report"
     RAW_DATA = "raw_data"
     TOOL_OUTPUT = "tool_output"
+    ACTION_PLAN = "action_plan"
+    EXECUTION_RESULTS = "execution_results"
+    TOOL_REGISTRY = "tool_registry"
 
 @dataclass
 class ContextEntry:

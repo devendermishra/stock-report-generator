@@ -1,0 +1,27 @@
+# LangChain and LangGraph dependencies for dynamic agent system
+# Core LangChain packages
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-openai>=0.1.0
+langchain-community>=0.1.0
+
+# LangGraph for workflow orchestration
+langgraph>=0.1.0
+
+# OpenAI integration
+openai>=1.0.0
+
+# Additional dependencies for tool integration
+pydantic>=2.0.0
+typing-extensions>=4.0.0
+
+# Existing project dependencies
+yfinance>=0.2.0
+duckduckgo-search>=3.0.0
+requests>=2.25.0
+beautifulsoup4>=4.9.0
+pymupdf>=1.23.0
+weasyprint>=60.0
+markdown>=3.4.0
+python-dotenv>=0.19.0
+
