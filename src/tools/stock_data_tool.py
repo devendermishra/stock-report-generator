@@ -24,17 +24,28 @@ _calculator = StockDataCalculator()
 _validator = StockDataValidator()
 
 @tool(
-    description="Get comprehensive stock metrics including current price, market cap, P/E ratio, volume, and other financial indicators for NSE stocks. Automatically adds .NS suffix if not provided.",
+    description="Get comprehensive stock metrics including current price, market cap, P/E ratio, volume, beta, "
+                "dividend yield, 52-week high/low, and other financial indicators for NSE stocks. Automatically adds .NS"
+                " suffix if not provided. Returns validated metrics with error handling. Essential for stock analysis"
+                " and valuation.",
     infer_schema=True,
-    parse_docstring=True,
-    error_on_invalid_docstring=False
+    parse_docstring=False
 )
 def get_stock_metrics(symbol: str) -> Dict[str, Any]:
     """
-    Get comprehensive stock metrics for a given symbol.
+    Get comprehensive stock metrics for a given NSE stock symbol.
+    
+    Retrieves real-time stock data including current price, market capitalization, P/E ratio,
+    volume, beta, dividend yield, 52-week high/low, and other key financial indicators.
     
     Args:
-        symbol: NSE stock symbol (e.g., 'RELIANCE' or 'RELIANCE.NS')
+        symbol: NSE stock symbol.
+    
+    Returns:
+        Dictionary containing stock metrics including symbol, company_name, sector,
+        current_price, market_cap, pe_ratio, pb_ratio, dividend_yield, 52_week_high,
+        52_week_low, volume, avg_volume, beta, currency, exchange, timestamp, and validation_issues.
+        Returns dictionary with 'error' key if symbol not found or data unavailable.
     """
     try:
         # Ensure .NS suffix for NSE stocks
@@ -97,17 +108,24 @@ def get_stock_metrics(symbol: str) -> Dict[str, Any]:
         return {"error": f"Failed to fetch stock metrics: {str(e)}"}
 
 @tool(
-    description="Get detailed company information including business description, sector, industry, website, employee count, and location for NSE stocks. Useful for understanding company background and business model.",
+    description="Get detailed company information including business description, sector, industry, website, employee count, location, and corporate details for NSE stocks. Returns comprehensive company profile data. Useful for understanding company background, business model, and corporate structure.",
     infer_schema=True,
-    parse_docstring=True,
-    error_on_invalid_docstring=False
+    parse_docstring=False
 )
 def get_company_info(symbol: str) -> Dict[str, Any]:
     """
-    Get company information for a given stock symbol.
+    Get detailed company information for a given NSE stock symbol.
+    
+    Retrieves comprehensive company profile data including business description, sector,
+    industry classification, corporate website, employee count, and location details.
     
     Args:
-        symbol: NSE stock symbol (e.g., 'RELIANCE' or 'RELIANCE.NS')
+        symbol: NSE stock symbol.
+    
+    Returns:
+        Dictionary containing symbol, company_name, short_name, sector, industry,
+        description, website, employees, city, state, country, currency, exchange, and timestamp.
+        Returns dictionary with 'error' key if symbol not found.
     """
     try:
         # Ensure .NS suffix for NSE stocks
@@ -147,17 +165,22 @@ def get_company_info(symbol: str) -> Dict[str, Any]:
         return {"error": f"Failed to fetch company info: {str(e)}"}
 
 @tool(
-    description="Validate if a stock symbol exists and is accessible on NSE. Checks symbol availability and returns company details if valid. Use this before fetching detailed metrics to avoid errors.",
+    description="Validate if a stock symbol exists and is accessible on NSE. Checks symbol availability, verifies price data access, and returns basic company details if valid. Returns validation status with company name and sector. Use this before fetching detailed metrics to avoid errors and ensure data availability.",
     infer_schema=True,
-    parse_docstring=True,
-    error_on_invalid_docstring=False
+    parse_docstring=False
 )
 def validate_symbol(symbol: str) -> Dict[str, Any]:
     """
-    Validate if a stock symbol exists and is accessible.
+    Validate if a stock symbol exists and is accessible on NSE.
+    
+    Checks if a stock symbol is valid, accessible, and has available price data.
+    Returns basic company information if the symbol is valid.
     
     Args:
-        symbol: NSE stock symbol (e.g., 'RELIANCE' or 'RELIANCE.NS')
+        symbol: NSE stock symbol to validate.
+    
+    Returns:
+        Dictionary containing valid (boolean), symbol, company_name, sector, and error (if invalid).
     """
     try:
         # Ensure .NS suffix for NSE stocks

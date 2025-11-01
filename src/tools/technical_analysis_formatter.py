@@ -5,6 +5,7 @@ Contains methods for formatting technical analysis data into readable reports.
 
 import logging
 from typing import Dict, Any
+from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
@@ -129,3 +130,32 @@ class TechnicalAnalysisFormatter:
             return "Weak negative momentum"
         else:
             return "Strong negative momentum"
+
+# Global formatter instance
+_formatter = TechnicalAnalysisFormatter()
+
+@tool(
+    description="Format technical analysis data into readable markdown reports. Processes technical indicators including moving averages, RSI, Bollinger Bands, support/resistance levels, and momentum indicators. Returns formatted analysis text suitable for reports.",
+    infer_schema=True,
+    parse_docstring=False
+)
+def format_technical_analysis(technical_data: Dict[str, Any]) -> str:
+    """
+    Format technical analysis data into readable markdown reports.
+    
+    Processes technical indicators and formats them into a structured, readable report.
+    Handles moving averages, RSI, Bollinger Bands, support/resistance levels, and momentum indicators.
+    
+    Args:
+        technical_data: Dictionary containing technical analysis data with indicators (dict),
+                       trend_analysis (str), support_resistance (dict), and momentum (float).
+    
+    Returns:
+        Formatted markdown string containing trend analysis, technical indicators,
+        support/resistance levels, and momentum analysis.
+    """
+    try:
+        return _formatter.format_technical_analysis(technical_data)
+    except Exception as e:
+        logger.error(f"Error formatting technical analysis: {e}")
+        return f"Error formatting technical analysis: {str(e)}"

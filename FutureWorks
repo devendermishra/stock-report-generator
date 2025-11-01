@@ -7,3 +7,11 @@
 - Improve one-shot prompt for recommendation.
 - Add detailed analysis of peer
 - Add generic prompt support
+- Add config support:
+    - Model parameters (model name, token limit, temperature for each step)
+- Add other models
+- Use LLM for:
+    - For content moderation
+    - For management analysis
+- Create Critique feedback loop
+- Build Tool resilience: Tools like websearch may return different result in future. Build it for resilience.

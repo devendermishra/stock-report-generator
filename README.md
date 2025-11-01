@@ -1,63 +1,104 @@
 # Stock Report Generator for NSE
 
-A sophisticated multi-agent AI system that generates comprehensive equity research reports for NSE stocks using **LangGraph** orchestration and **Model Context Protocol (MCP)** for collaborative reasoning.
+A sophisticated multi-agent AI system that generates comprehensive equity research reports for NSE stocks using **LangGraph** orchestration with **7 specialized autonomous agents** and **15+ integrated tools** for collaborative reasoning.
 
 ## 🎯 Overview
 
 This system demonstrates advanced AI collaboration by using multiple specialized agents that work together to analyze stocks from different perspectives:
 
-- **Sector Analysis** - Market trends and peer comparison
-- **Stock Research** - Financial metrics and technical analysis  
-- **Management Analysis** - Strategic insights from reports and calls
-- **Report Review** - Final synthesis and professional formatting
+- **Research Planning** - Creates structured research plans with ordered tool calls
+- **Data Gathering** - Company information, sector analysis, peer comparison
+- **Financial Analysis** - Comprehensive financial statement analysis
+- **Management Analysis** - Management effectiveness and governance assessment
+- **Technical Analysis** - Technical indicators and trend analysis
+- **Valuation Analysis** - Valuation metrics and target price calculation
+- **Report Synthesis** - Final professional report generation
 
 ## 🏗️ Architecture
 
-### Multi-Agent System
+### Multi-Agent System (7 Agents)
 ```
 User Input (Stock Symbol)
      │
      ▼
-[ SectorResearcherAgent ] ─► sector_summary
-     │
-     ▼
-[ StockResearcherAgent ] ─► stock_summary
-     │
-     ▼
-[ ManagementAnalysisAgent ] ─► management_summary
-     │
-     ▼
-[ ReportReviewerAgent ] ─► final_report.md
+┌─────────────────────┐
+│ ResearchPlanner     │ Creates structured research plan
+│      Agent          │
+└──────────┬──────────┘
+           │
+     ┌─────▼─────┐
+     │ Research  │ Gathers company & sector data
+     │  Agent    │
+     └─────┬─────┘
+           │
+     ┌─────┼─────┬─────────────┐
+     │     │     │             │
+┌────▼─┐ ┌─▼──┐ ┌─▼──┐ ┌──────▼─┐
+│Finan-│ │Mgmt│ │Tech│ │Valuat- │ 4 Analysis Agents
+│cial  │ │Anal│ │Anal│ │ion     │ (Run in Parallel)
+│Anal  │ │    │ │    │ │Anal    │
+└──┬───┘ └─┬──┘ └─┬──┘ └───┬────┘
+   └───────┼──────┼────────┘
+           │      │
+     ┌─────▼──────▼─────┐
+     │   Report Agent   │ Synthesizes all results
+     └──────────────────┘
+           │
+     ┌─────▼─────┐
+     │ Final     │ Markdown + PDF
+     │ Report    │
+     └───────────┘
 ```
 
 ### Key Components
 
-#### 🤖 Agents (4 Total)
-1. **SectorResearcherAgent** - Analyzes sector trends, peer comparison, regulatory environment
-2. **StockResearcherAgent** - Retrieves financial data, technical analysis, valuation metrics
-3. **ManagementAnalysisAgent** - Processes reports, extracts management insights
-4. **ReportReviewerAgent** - Synthesizes all outputs into final professional report
+#### 🤖 Agents (7 Total)
+1. **ResearchPlannerAgent** - Creates structured research plans with ordered tool call sequences
+2. **ResearchAgent** - Gathers company information, sector overview, and peer data
+3. **FinancialAnalysisAgent** - Performs comprehensive financial statement analysis
+4. **ManagementAnalysisAgent** - Analyzes management effectiveness and governance
+5. **TechnicalAnalysisAgent** - Performs technical analysis with indicators
+6. **ValuationAnalysisAgent** - Performs valuation analysis and target price calculation
+7. **ReportAgent** - Synthesizes all data into comprehensive reports
 
-#### 🛠️ Tools (7 Total)
-1. **WebSearchTool** - Fetches sector news and market trends (DuckDuckGo search - free, no API key required)
-2. **StockDataTool** - Retrieves stock data and metrics (yfinance, NSE API)
-3. **ReportFetcherTool** - Downloads financial reports and transcripts
-4. **PDFParserTool** - Extracts and processes text from PDF documents
-5. **SummarizerTool** - AI-powered text summarization and insight extraction
-6. **ReportFormatterTool** - Generates professional markdown reports
-7. **PDFGeneratorTool** - Converts markdown reports to professional PDF format
+#### 🛠️ Tools (15+ Total)
+
+**Stock Data Tools:**
+- **get_stock_metrics** - Retrieves stock price data, financial metrics, market data (yfinance)
+- **get_company_info** - Fetches company information, business details, fundamentals
+- **validate_symbol** - Validates stock symbols against NSE
+
+**Web Search Tools:**
+- **search_sector_news** - Searches for sector-specific news and trends (DuckDuckGo)
+- **search_company_news** - Searches for company-specific news
+- **search_market_trends** - Searches for market trends and analysis
+- **generic_web_search** - Generic web search capability
+
+**Analysis & Calculation Tools:**
+- **TechnicalAnalysisFormatter** - Formats and processes technical analysis data
+- **StockDataCalculator** - Performs financial calculations and ratios
+
+**Report Generation Tools:**
+- **PDFGeneratorTool** - Generates professional PDF reports
+- **ReportFormatterTool** - Formats reports in markdown/professional format
+
+**Text Processing Tools:**
+- **SummarizerTool** - AI-powered text summarization and insight extraction
+  - `summarize_text()` - Summarizes documents with key points
+  - `extract_insights()` - Extracts structured insights from text
+
+**Additional Tools:**
+- **PDFParserTool** - Extracts text from PDF documents
+- **ReportFetcherTool** - Downloads financial reports and transcripts
 
 #### 🔄 LangGraph Orchestration
-- **Workflow Management** - Coordinates agent execution
-- **Error Handling** - Graceful failure recovery
-- **State Management** - Tracks progress across agents
-- **Conditional Logic** - Smart routing based on results
-
-#### 🧠 MCP Context Sharing
-- **Shared Memory** - Agents access previous outputs
-- **Data Persistence** - Maintains context across workflow
-- **Conflict Resolution** - Handles data inconsistencies
-- **Quality Assurance** - Validates and enhances outputs
+- **MultiAgentOrchestrator** - Manages workflow and agent coordination
+- **StateGraph** - LangGraph StateGraph for workflow management
+- **Parallel Execution** - Analysis agents run concurrently for efficiency
+- **Structured State** - MultiAgentState (Pydantic model) for communication
+- **Error Handling** - Graceful failure recovery with error propagation
+- **Conditional Logic** - Smart routing based on results and errors
+- **State Management** - Tracks progress across all 7 agents
 
 ## 🚀 Quick Start
 
@@ -88,20 +129,26 @@ cp env.example .env
 4. **Run the system**
 ```bash
 cd src
-python main.py --symbol RELIANCE --company "Reliance Industries Limited" --sector "Oil & Gas"
+python main.py RELIANCE "Reliance Industries Limited" "Oil & Gas"
 ```
 
 ### Example Usage
 
 ```bash
 # Generate report for Reliance Industries
-python main.py --symbol RELIANCE --company "Reliance Industries Limited" --sector "Oil & Gas"
+python src/main.py RELIANCE "Reliance Industries Limited" "Oil & Gas"
 
-# Generate report for TCS
-python main.py --symbol TCS --company "Tata Consultancy Services" --sector "IT"
+# Generate report for TCS (company name and sector auto-detected if not provided)
+python src/main.py TCS
 
 # Generate report for HDFC Bank
-python main.py --symbol HDFCBANK --company "HDFC Bank Limited" --sector "Banking"
+python src/main.py HDFCBANK "HDFC Bank Limited" "Banking"
+
+# Export graph diagram
+python src/main.py RELIANCE --export-graph graph.png
+
+# Export graph only (without generating report)
+python src/main.py --export-graph-only graph.png
 ```
 
 ## 🚀 GPU Acceleration (Optional)
@@ -238,52 +285,65 @@ OUTPUT_DIR=reports
 
 ```
 src/
-├── agents/                    # AI Agents
-│   ├── sector_researcher.py   # Sector analysis agent
-│   ├── stock_researcher.py    # Stock research agent
-│   ├── management_analysis.py # Management analysis agent
-│   └── report_reviewer.py     # Final report agent
-├── tools/                     # MCP Tools
-│   ├── web_search_tool.py     # Web search capabilities
-│   ├── stock_data_tool.py     # Stock data retrieval
-│   ├── report_fetcher_tool.py # Report downloading
-│   ├── pdf_parser_tool.py     # PDF processing
-│   ├── summarizer_tool.py     # Text summarization
-│   ├── report_formatter_tool.py # Report formatting
-│   └── pdf_generator_tool.py  # PDF generation
-├── graph/                     # LangGraph Orchestration
-│   ├── context_manager_mcp.py # MCP context management
-│   └── stock_report_graph.py  # Workflow orchestration
-├── main.py                    # Entry point
-├── config.py                  # Configuration
-└── generate_pdf_from_markdown.py # PDF conversion utility
+├── agents/                           # AI Agents (7 agents)
+│   ├── __init__.py
+│   ├── base_agent.py                 # Base agent class
+│   ├── research_planner_agent.py    # Research planner agent
+│   ├── research_agent.py             # Research agent
+│   ├── financial_analysis_agent.py  # Financial analysis agent
+│   ├── management_analysis_agent.py # Management analysis agent
+│   ├── technical_analysis_agent.py  # Technical analysis agent
+│   ├── valuation_analysis_agent.py  # Valuation analysis agent
+│   └── report_agent.py               # Report synthesis agent
+├── tools/                            # Tool Implementations (15+ tools)
+│   ├── __init__.py
+│   ├── stock_data_tool.py            # Stock data retrieval (yfinance, NSE)
+│   ├── web_search_tool.py            # Web search (DuckDuckGo)
+│   ├── generic_web_search_tool.py     # Generic web search
+│   ├── summarizer_tool.py            # Text summarization
+│   ├── pdf_generator_tool.py          # PDF generation
+│   ├── report_formatter_tool.py      # Report formatting
+│   ├── technical_analysis_formatter.py # Technical analysis
+│   ├── stock_data_calculator.py      # Financial calculations
+│   ├── pdf_parser_tool.py            # PDF parsing
+│   └── report_fetcher_tool.py       # Report fetching
+├── graph/                            # LangGraph Orchestration
+│   └── multi_agent_graph.py          # MultiAgentOrchestrator
+├── main.py                            # Entry point
+└── config.py                          # Configuration
+
+REQUIREMENTS_CHECKLIST.md              # Requirements verification
+IMPLEMENTATION_SUMMARY.md               # Implementation details
+MULTI_AGENT_README.md                  # Comprehensive documentation
 ```
 
 ## 🔍 How It Works
 
-### 1. **Sector Research Phase**
-- Searches for sector news and trends
-- Analyzes peer company performance
-- Researches regulatory environment
-- Uses AI to synthesize insights
+### 1. **Research Planning Phase** (ResearchPlannerAgent)
+- Analyzes stock symbol, company, and sector context
+- Reviews available tools
+- Creates structured research plan with ordered tool calls
+- Outputs executable plan for data gathering
 
-### 2. **Stock Research Phase**
-- Retrieves real-time stock data
-- Calculates technical indicators
-- Performs valuation analysis
-- Generates investment rating
+### 2. **Data Gathering Phase** (ResearchAgent)
+- Executes research plan from planner
+- Retrieves real-time stock data (yfinance, NSE)
+- Searches for company and sector news
+- Gathers peer comparison data
+- Collects comprehensive research data
 
-### 3. **Management Analysis Phase**
-- Downloads financial reports
-- Extracts management insights
-- Analyzes strategic initiatives
-- Identifies risks and opportunities
+### 3. **Parallel Analysis Phase** (4 Agents run concurrently)
+- **FinancialAnalysisAgent**: Financial statement analysis, ratios, health assessment
+- **ManagementAnalysisAgent**: Management effectiveness, governance analysis
+- **TechnicalAnalysisAgent**: Technical indicators, trends, support/resistance
+- **ValuationAnalysisAgent**: Valuation metrics, target price calculation
 
-### 4. **Report Review Phase**
-- Combines all agent outputs
-- Checks for consistency
-- Resolves conflicts
-- Formats final report
+### 4. **Report Synthesis Phase** (ReportAgent)
+- Receives all analysis results from 4 analysis agents
+- Synthesizes comprehensive report
+- Formats professional markdown document
+- Generates PDF report with styling
+- Ensures all required sections are included
 
 ## 🛡️ Error Handling & Quality Assurance
 
@@ -315,29 +375,39 @@ src/
 
 ## 🔧 Advanced Usage
 
-### Custom Configuration
+### Programmatic Usage
+```python
+import asyncio
+from src.main import StockReportGenerator
+
+# Initialize generator
+generator = StockReportGenerator()
+
+# Generate report programmatically
+async def main():
+    result = await generator.generate_report(
+        stock_symbol="RELIANCE",
+        company_name="Reliance Industries Limited",  # Optional, auto-detected
+        sector="Oil & Gas"  # Optional, auto-detected
+    )
+    
+    print(f"Status: {result['workflow_status']}")
+    print(f"PDF Path: {result.get('pdf_path')}")
+    print(f"Errors: {result.get('errors', [])}")
+
+# Run async function
+asyncio.run(main())
+```
+
+### Synchronous Usage
 ```python
 from src.main import StockReportGenerator
 
 generator = StockReportGenerator()
-generator.initialize()
 
-# Generate report programmatically
-result = await generator.generate_report(
-    stock_symbol="RELIANCE",
-    company_name="Reliance Industries Limited",
-    sector="Oil & Gas"
-)
-```
-
-### Workflow Status Monitoring
-```python
-# Check workflow status
-status = generator.get_report_status("RELIANCE")
-print(f"Status: {status['status']['workflow_status']}")
-
-# Export workflow data
-export_data = generator.export_workflow_data("RELIANCE")
+# Synchronous wrapper
+result = generator.generate_report_sync("RELIANCE")
+print(f"Report generated: {result['workflow_status']}")
 ```
 
 ## 🧪 Testing & Development
@@ -373,24 +443,32 @@ pre-commit install
 ### Core Classes
 
 #### `StockReportGenerator`
-Main orchestrator class for the system.
+Main orchestrator class for the system. Initializes and manages the multi-agent workflow.
 
-#### `MCPContextManager`
-Manages shared memory and context between agents.
-
-#### `StockReportGraph`
-LangGraph workflow orchestrator.
+#### `MultiAgentOrchestrator`
+LangGraph-based orchestrator that manages workflow and agent coordination.
+- Manages 7 agents with distinct roles
+- Coordinates parallel execution of analysis agents
+- Handles state management and error propagation
 
 ### Key Methods
 
-#### `generate_report(stock_symbol, company_name, sector)`
-Generates a comprehensive stock report.
+#### `generate_report(stock_symbol, company_name=None, sector=None)`
+Generates a comprehensive stock report using all 7 agents.
+- **stock_symbol**: NSE stock symbol (required)
+- **company_name**: Full company name (optional, auto-detected)
+- **sector**: Sector name (optional, auto-detected)
+- **Returns**: Dictionary with workflow results, PDF path, errors, etc.
 
-#### `get_report_status(stock_symbol)`
-Gets the current status of report generation.
+#### `generate_report_sync(stock_symbol, company_name=None, sector=None)`
+Synchronous wrapper for `generate_report()`.
 
-#### `export_workflow_data(stock_symbol)`
-Exports complete workflow data for analysis.
+### Agent Classes
+
+All agents inherit from `BaseAgent` and implement:
+- `execute_task()` - Main task execution
+- `execute_task_partial()` - Partial state update execution
+- `select_tools()` - Autonomous tool selection
 
 ## 🤝 Contributing
 
@@ -451,15 +529,43 @@ For issues and questions:
 3. Verify API keys are correct
 4. Ensure all dependencies are installed
 
+## ✅ Requirements Compliance
+
+This system meets and exceeds multi-agent system requirements:
+
+- ✅ **7 specialized agents** with distinct roles (exceeds minimum of 3)
+- ✅ **15+ integrated tools** (exceeds minimum of 3)
+- ✅ **LangGraph orchestration** framework with parallel execution
+- ✅ Clear communication via structured `MultiAgentState`
+- ✅ Tools extend beyond basic LLM responses (API calls, file processing, calculations)
+
+**See `REQUIREMENTS_CHECKLIST.md` for detailed verification.**
+
 ## 🔮 Future Enhancements
 
 - **Real-time Data Integration** - Live market data feeds
-- **Advanced Analytics** - Machine learning models
+- **Additional Agents** - News analysis, risk assessment, ESG analysis
+- **Advanced Analytics** - Machine learning models for predictions
 - **Portfolio Analysis** - Multi-stock comparison
 - **Custom Templates** - Configurable report formats
 - **API Endpoints** - REST API for integration
 - **Dashboard Interface** - Web-based UI
+- **Visualization Tools** - Charts, graphs, interactive reports
+
+## 📖 Additional Documentation
+
+- **REQUIREMENTS_CHECKLIST.md** - Detailed requirements verification
+- **IMPLEMENTATION_SUMMARY.md** - Comprehensive implementation details
+- **MULTI_AGENT_README.md** - Agent-specific documentation
 
 ---
 
-**Built with ❤️ using LangGraph, MCP, and modern AI technologies.**
+**Built with ❤️ using LangGraph, LangChain, and modern AI technologies.**
+
+**Key Technologies:**
+- LangGraph for multi-agent orchestration
+- LangChain for tool integration
+- OpenAI GPT models for agent reasoning
+- yfinance for stock data
+- DuckDuckGo for web search
+- ReportLab for PDF generation

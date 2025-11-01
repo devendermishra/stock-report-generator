@@ -12,6 +12,29 @@ logger = logging.getLogger(__name__)
 class StockDataCalculator:
     """Handles calculation of financial metrics and ratios."""
     
+    def calculate_metrics(self, ticker, info: Dict[str, Any], current_price: float) -> Dict[str, Any]:
+        """
+        Aggregate a lightweight set of metrics derived from available sources.
+        This complements raw `info` and recent price, and is used for validation.
+        """
+        try:
+            metrics: Dict[str, Any] = {
+                "symbol": info.get("symbol"),
+                "current_price": current_price,
+                "market_cap": info.get("marketCap"),
+                "pe_ratio": info.get("trailingPE") or info.get("forwardPE"),
+                "pb_ratio": info.get("priceToBook"),
+                "eps": info.get("trailingEps") or info.get("forwardEps"),
+                "dividend_yield": info.get("dividendYield"),
+                "beta": info.get("beta"),
+                "high_52w": info.get("fiftyTwoWeekHigh"),
+                "low_52w": info.get("fiftyTwoWeekLow"),
+            }
+            return metrics
+        except Exception as e:
+            logger.warning(f"calculate_metrics failed: {e}")
+            return {"symbol": info.get("symbol"), "current_price": current_price}
+    
     def calculate_revenue_growth(self, ticker, info: Dict[str, Any]) -> Optional[float]:
         """Calculate revenue growth from multiple sources."""
         try:

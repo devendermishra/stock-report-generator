@@ -4,6 +4,8 @@ Contains methods for validating stock symbols and data quality.
 """
 
 import logging
+from dataclasses import dataclass
+from typing import List, Dict, Any
 from .stock_data_models import CompanyInfo
 
 logger = logging.getLogger(__name__)
@@ -11,6 +13,22 @@ logger = logging.getLogger(__name__)
 
 class StockDataValidator:
     """Handles validation of stock symbols and data quality."""
+    
+    @dataclass
+    class ValidationResult:
+        is_valid: bool
+        issues: List[str]
+    
+    def validate_metrics(self, metrics: Dict[str, Any]) -> "StockDataValidator.ValidationResult":
+        """Validate presence and sanity of key metrics used by callers."""
+        issues: List[str] = []
+        if metrics.get("current_price") in (None, 0):
+            issues.append("Missing or zero current_price")
+        if metrics.get("market_cap") in (None, 0):
+            issues.append("Missing market_cap")
+        if metrics.get("high_52w") is None or metrics.get("low_52w") is None:
+            issues.append("Missing 52-week range")
+        return StockDataValidator.ValidationResult(is_valid=len(issues) == 0, issues=issues)
     
     def validate_symbol(self, symbol: str) -> bool:
         """
