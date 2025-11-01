@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import os
 import time
+from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
@@ -336,3 +337,70 @@ class ReportFetcherTool:
         except Exception as e:
             logger.error(f"Error getting download stats: {e}")
             return {"total_files": 0, "total_size": 0}
+
+# Global report fetcher instance
+_report_fetcher = ReportFetcherTool()
+
+@tool(
+    description="Fetch annual reports for a company from specified years. Downloads annual reports from financial databases or company websites. Returns list of downloaded reports with file paths and metadata. Essential for accessing historical financial data and company annual reports.",
+    infer_schema=True,
+    parse_docstring=False
+)
+def fetch_annual_reports(
+    company_name: str,
+    years: List[int],
+    max_reports: int = 3,
+    download_dir: str = "temp/reports"
+) -> Dict[str, Any]:
+    """
+    Fetch annual reports for a company from specified years.
+    
+    Downloads annual reports from financial databases or company websites.
+    
+    Args:
+        company_name: Full company name.
+        years: List of years to fetch reports for.
+        max_reports: Maximum number of reports to download (default: 3).
+        download_dir: Directory to store downloaded reports (default: "temp/reports").
+    
+    Returns:
+        Dictionary containing success, company_name, total_downloaded, reports (list),
+        download_dir, and error (if failed).
+    """
+    try:
+        fetcher = ReportFetcherTool(download_dir=download_dir)
+        results = fetcher.fetch_annual_reports(company_name, years, max_reports)
+        
+        # Convert DownloadResult objects to dictionaries
+        reports = []
+        for result in results:
+            reports.append({
+                "success": result.success,
+                "file_path": result.file_path,
+                "error_message": result.error_message,
+                "report_info": {
+                    "title": result.report_info.title if result.report_info else None,
+                    "url": result.report_info.url if result.report_info else None,
+                    "report_type": result.report_info.report_type if result.report_info else None,
+                    "date": result.report_info.date.isoformat() if result.report_info and result.report_info.date else None,
+                    "format": result.report_info.format if result.report_info else None
+                } if result.report_info else None
+            })
+        
+        return {
+            "success": any(r.success for r in results),
+            "company_name": company_name,
+            "total_downloaded": sum(1 for r in results if r.success),
+            "reports": reports,
+            "download_dir": download_dir
+        }
+    except Exception as e:
+        logger.error(f"Error fetching annual reports: {e}")
+        return {
+            "success": False,
+            "company_name": company_name,
+            "total_downloaded": 0,
+            "reports": [],
+            "error": str(e),
+            "download_dir": download_dir
+        }

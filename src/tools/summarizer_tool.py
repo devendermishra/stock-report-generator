@@ -13,9 +13,11 @@ from langchain_core.tools import tool
 try:
     # Try relative imports first (when run as module)
     from ..tools.openai_logger import openai_logger
+    from ..config import Config
 except ImportError:
     # Fall back to absolute imports (when run as script)
     from tools.openai_logger import openai_logger
+    from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -40,29 +42,36 @@ class InsightExtraction:
 
 # Global configuration
 _api_key = None
-_model = "gpt-4o-mini"
+_model = Config.DEFAULT_MODEL
 
-def initialize_summarizer(api_key: str, model: str = "gpt-4o-mini"):
+def initialize_summarizer(api_key: str, model: str = None):
     """Initialize the summarizer with API key and model."""
     global _api_key, _model
     _api_key = api_key
-    _model = model
+    _model = model or Config.DEFAULT_MODEL
     openai.api_key = api_key
 
 @tool(
     description="Summarize financial documents, reports, and text content with AI-powered analysis. Extracts key points, sentiment, and insights. Perfect for processing earnings reports, analyst notes, and financial documents.",
     infer_schema=True,
-    parse_docstring=True,
-    error_on_invalid_docstring=False
+    parse_docstring=False
 )
 def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    Summarize a given text with focus on specific areas.
+    Summarize financial documents, reports, and text content with AI-powered analysis.
+    
+    Creates concise summaries of financial documents, extracting key points, sentiment analysis,
+    and structured insights. Useful for processing earnings reports, analyst notes, and
+    management discussions.
     
     Args:
-        text: Text to summarize
-        max_length: Maximum length of summary
-        focus_areas: Optional list of focus areas (e.g., ['financial', 'strategic'])
+        text: The text content to summarize.
+        max_length: Maximum word count for the summary (default: 500).
+        focus_areas: Optional list of focus areas to emphasize.
+    
+    Returns:
+        Dictionary containing original_text, summary, key_points, sentiment, confidence,
+        word_count, and summary_ratio. Returns dictionary with 'error' key if summarization fails.
     """
     try:
         if not _api_key:
@@ -170,16 +179,23 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
 @tool(
     description="Extract key insights, metrics, and structured information from financial documents and text. Categorizes insights by type (financial, strategic, operational) and provides sentiment analysis. Ideal for analyzing earnings calls, reports, and financial statements.",
     infer_schema=True,
-    parse_docstring=True,
-    error_on_invalid_docstring=False
+    parse_docstring=False
 )
 def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    Extract insights and key information from text.
+    Extract key insights, metrics, and structured information from financial documents.
+    
+    Performs deep analysis of financial text to extract actionable insights, categorize them
+    by type, and provide comprehensive sentiment analysis. Designed for earnings call transcripts,
+    annual reports, and financial statements.
     
     Args:
-        text: Text to analyze
-        categories: Optional list of categories to focus on
+        text: The text content to analyze. Should contain financial or business-related information.
+        categories: Optional list of categories to focus on.
+    
+    Returns:
+        Dictionary containing insights (list), categories (dict), sentiment_analysis (dict),
+        and key_metrics (dict). Returns dictionary with 'error' key if extraction fails.
     """
     try:
         if not _api_key:
@@ -308,16 +324,16 @@ class SummarizerTool:
     management discussions, and other text content.
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+    def __init__(self, api_key: str, model: str = None):
         """
         Initialize the Summarizer Tool.
         
         Args:
             api_key: OpenAI API key
-            model: Model to use for summarization
+            model: Model to use for summarization (defaults to Config.DEFAULT_MODEL)
         """
         self.api_key = api_key
-        self.model = model
+        self.model = model or Config.DEFAULT_MODEL
         openai.api_key = api_key
         
     def summarize_text(

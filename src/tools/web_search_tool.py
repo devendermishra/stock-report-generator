@@ -33,17 +33,22 @@ _max_results = 10
 @tool(
     description="Search for sector-specific news and market trends from Indian financial markets. Returns recent news articles, analysis, and market insights for a given sector. Useful for understanding sector performance and trends.",
     infer_schema=True,
-    parse_docstring=True,
-    error_on_invalid_docstring=False
+    parse_docstring=False
 )
 def search_sector_news(sector: str, days_back: int = 7, include_analysis: bool = True) -> Dict[str, Any]:
     """
-    Search for sector-specific news and trends.
+    Search for sector-specific news and market trends from Indian financial markets.
+    
+    Retrieves recent news articles, analysis, and market insights for a specified sector.
     
     Args:
-        sector: Sector name (e.g., "Banking", "IT", "Pharmaceuticals")
-        days_back: Number of days to look back for news
-        include_analysis: Whether to include analysis and opinion pieces
+        sector: Sector name to search for.
+        days_back: Number of days to look back for news (default: 7).
+        include_analysis: Whether to include analysis and opinion pieces (default: True).
+    
+    Returns:
+        Dictionary containing query, sector, days_back, time_keywords, results (list),
+        total_results, and search_timestamp. Returns dictionary with 'error' key if search fails.
     """
     try:
         if not _ddgs:
@@ -95,17 +100,22 @@ def search_sector_news(sector: str, days_back: int = 7, include_analysis: bool =
 @tool(
     description="Search for company-specific news, announcements, earnings reports, and corporate updates from Indian financial markets. Returns recent news articles and press releases for a specific company and stock symbol.",
     infer_schema=True,
-    parse_docstring=True,
-    error_on_invalid_docstring=False
+    parse_docstring=False
 )
 def search_company_news(company_name: str, stock_symbol: str, days_back: int = 7) -> Dict[str, Any]:
     """
-    Search for company-specific news and announcements.
+    Search for company-specific news, announcements, and corporate updates.
+    
+    Retrieves recent news articles, press releases, and earnings announcements for a company.
     
     Args:
-        company_name: Full company name
-        stock_symbol: NSE stock symbol
-        days_back: Number of days to look back for news
+        company_name: Full company name.
+        stock_symbol: NSE stock symbol.
+        days_back: Number of days to look back for news (default: 7).
+    
+    Returns:
+        Dictionary containing query, company_name, stock_symbol, days_back, time_keywords,
+        results (list), total_results, and search_timestamp. Returns dictionary with 'error' key if search fails.
     """
     try:
         if not _ddgs:
@@ -155,16 +165,21 @@ def search_company_news(company_name: str, stock_symbol: str, days_back: int = 7
 @tool(
     description="Search for general market trends, economic analysis, and financial market insights from Indian markets. Use this for broad market research, economic indicators, and trend analysis.",
     infer_schema=True,
-    parse_docstring=True,
-    error_on_invalid_docstring=False
+    parse_docstring=False
 )
 def search_market_trends(query: str, max_results: int = 10) -> Dict[str, Any]:
     """
-    Search for general market trends and analysis.
+    Search for general market trends, economic analysis, and financial market insights.
+    
+    Performs web searches for broad market research, economic indicators, and trend analysis.
     
     Args:
-        query: Search query for market trends
-        max_results: Maximum number of results to return
+        query: Search query string for market trends.
+        max_results: Maximum number of results to return (default: 10).
+    
+    Returns:
+        Dictionary containing query, original_query, results (list), total_results, and search_timestamp.
+        Returns dictionary with 'error' key if search fails.
     """
     try:
         if not _ddgs:
@@ -298,7 +313,7 @@ def _search_with_retry(query: str, max_retries: int = 3) -> List[Dict[str, Any]]
             logger.info(f"Search attempt {attempt + 1}/{max_retries} for query: {query}")
             
             # Try different engines if available
-            engines_to_try = ['google', 'bing', 'duckduckgo']
+            engines_to_try = ['mullvad_google', 'bing', 'duckduckgo']
             
             for engine in engines_to_try:
                 try:
@@ -508,7 +523,7 @@ class WebSearchTool:
                 logger.info(f"Search attempt {attempt + 1}/{max_retries} for query: {query}")
                 
                 # Try different engines if available
-                engines_to_try = ['google', 'bing', 'duckduckgo']
+                engines_to_try = ['mullvad_google', 'bing', 'duckduckgo']
                 
                 for engine in engines_to_try:
                     try:

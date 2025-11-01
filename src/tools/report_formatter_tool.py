@@ -9,6 +9,7 @@ from datetime import datetime
 import os
 import random
 import numpy as np
+from langchain_core.tools import tool
 
 # Set random seeds for reproducibility
 random.seed(42)
@@ -796,6 +797,37 @@ class ReportFormatterTool:
         # Determine recommendation based on multiple factors
         recommendation = self._determine_recommendation(sector_summary, stock_summary, management_summary)
         
+        # Generate action guidance for existing holders based on recommendation
+        if recommendation['rating'] == "BUY":
+            existing_holder_guidance = """
+**For Existing Holders:**
+- **Continue Holding:** The stock shows strong fundamentals and positive outlook, making it a good candidate for holding
+- **Consider Adding:** If you have room in your portfolio and agree with the thesis, consider averaging up on dips
+- **Set Stop-Loss:** Protect gains by setting a stop-loss at 10-15% below current levels or at key support levels
+- **Take Partial Profits:** If the stock has run up significantly, consider taking partial profits while maintaining core position
+- **Monitor Catalysts:** Watch for the key catalysts mentioned above that could drive further upside
+            """.strip()
+        elif recommendation['rating'] == "SELL":
+            existing_holder_guidance = """
+**For Existing Holders:**
+- **Consider Exiting:** Given the concerns identified, consider reducing or exiting your position
+- **Staggered Exit:** If you have substantial holdings, consider a staggered exit to avoid market impact
+- **Tax Implications:** Review tax implications before selling, especially for long-term holdings
+- **Stop-Loss Immediately:** Set a tight stop-loss to protect capital if you plan to hold temporarily
+- **Review Entry Thesis:** Reassess your original investment thesis - if it no longer holds, exit the position
+- **Consider Alternatives:** Look for better opportunities in the same sector or other sectors
+            """.strip()
+        else:  # HOLD
+            existing_holder_guidance = """
+**For Existing Holders:**
+- **Maintain Position:** The analysis suggests holding your current position without major changes
+- **Avoid Averaging:** Given mixed signals, avoid aggressive averaging down unless you have high conviction
+- **Regular Monitoring:** Keep a close watch on the key factors mentioned above for any changes
+- **Partial Profit Taking:** If you're sitting on gains, consider taking partial profits while keeping core holdings
+- **Rebalance if Needed:** If this position has become too large in your portfolio, consider rebalancing
+- **Stay Disciplined:** Stick to your investment plan and avoid emotional decisions based on short-term volatility
+            """.strip()
+        
         content = f"""
 ## Investment Recommendation
 
@@ -824,6 +856,9 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
 
 ### Key Catalysts
 {recommendation['catalysts']}
+
+### Action for Existing Holders
+{existing_holder_guidance}
         """.strip()
         
         return ReportSection(
@@ -1334,3 +1369,93 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
         except Exception as e:
             logger.error(f"Error saving report: {e}")
             raise
+
+# Global formatter instance
+_formatter = ReportFormatterTool()
+
+@tool(
+    description="Format comprehensive stock research reports from multiple agent outputs. Combines sector analysis, stock metrics, management analysis, and SWOT data into a professionally formatted markdown report. Essential for generating final stock research reports with proper structure and formatting.",
+    infer_schema=True,
+    parse_docstring=False
+)
+def format_stock_report(
+    stock_symbol: str,
+    sector_summary: Dict[str, Any],
+    stock_summary: Dict[str, Any],
+    management_summary: Dict[str, Any],
+    swot_summary: Optional[Dict[str, Any]] = None,
+    additional_data: Optional[Dict[str, Any]] = None,
+    output_dir: str = "reports"
+) -> Dict[str, Any]:
+    """
+    Format comprehensive stock research reports from multiple agent outputs.
+    
+    Combines outputs from multiple analysis agents into a single professionally formatted
+    markdown report with executive summary, company overview, sector analysis, financial
+    performance, management analysis, and recommendations.
+    
+    Args:
+        stock_symbol: NSE stock symbol.
+        sector_summary: Dictionary containing sector analysis output.
+        stock_summary: Dictionary containing stock analysis output.
+        management_summary: Dictionary containing management analysis output.
+        swot_summary: Optional dictionary containing SWOT analysis.
+        additional_data: Optional dictionary with additional data.
+        output_dir: Directory to save formatted report (default: "reports").
+    
+    Returns:
+        Dictionary containing success, markdown_content, sections, metadata,
+        consistency_issues, file_path, and error (if failed).
+    """
+    try:
+        formatter = ReportFormatterTool(output_dir=output_dir)
+        formatted_report = formatter.format_report(
+            stock_symbol=stock_symbol,
+            sector_summary=sector_summary,
+            stock_summary=stock_summary,
+            management_summary=management_summary,
+            swot_summary=swot_summary,
+            additional_data=additional_data
+        )
+        
+        # Check consistency
+        consistency_issues = formatter.check_consistency(formatted_report)
+        
+        # Save report
+        file_path = formatter.save_report(formatted_report)
+        
+        return {
+            "success": True,
+            "markdown_content": formatted_report.markdown_content,
+            "sections": [
+                {
+                    "title": section.title,
+                    "content": section.content,
+                    "order": section.order
+                }
+                for section in formatted_report.sections
+            ],
+            "metadata": formatted_report.metadata,
+            "consistency_issues": [
+                {
+                    "issue_type": issue.issue_type,
+                    "description": issue.description,
+                    "severity": issue.severity,
+                    "location": issue.location,
+                    "suggestion": issue.suggestion
+                }
+                for issue in consistency_issues
+            ],
+            "file_path": file_path
+        }
+    except Exception as e:
+        logger.error(f"Error formatting stock report: {e}")
+        return {
+            "success": False,
+            "error": f"Report formatting failed: {str(e)}",
+            "markdown_content": None,
+            "sections": [],
+            "metadata": {},
+            "consistency_issues": [],
+            "file_path": None
+        }

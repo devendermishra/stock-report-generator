@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import re
 import os
 from datetime import datetime
+from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
@@ -477,3 +478,89 @@ class PDFParserTool:
         except Exception as e:
             logger.error(f"Error searching in document: {e}")
             return []
+
+# Global parser instance for tool functions
+_parser = PDFParserTool()
+
+@tool(
+    description="Parse PDF files and extract text content with intelligent chunking. Extracts text from financial documents, reports, and PDFs, splitting them into manageable chunks for analysis. Supports PyMuPDF and PyPDF2 backends. Essential for processing annual reports, financial statements, and other PDF documents.",
+    infer_schema=True,
+    parse_docstring=False
+)
+def parse_pdf(file_path: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> Dict[str, Any]:
+    """
+    Parse a PDF file and extract text content with intelligent chunking.
+    
+    Extracts text from PDF documents, splitting them into manageable chunks for analysis.
+    Supports both PyMuPDF and PyPDF2 backends.
+    
+    Args:
+        file_path: Path to the PDF file to parse.
+        chunk_size: Size of text chunks in characters (default: 1000).
+        chunk_overlap: Overlap between chunks in characters (default: 200).
+    
+    Returns:
+        Dictionary containing title, total_pages, chunks (list with content, page_number,
+        chunk_index, metadata), metadata, and extraction_timestamp.
+        Returns dictionary with 'error' key if parsing fails.
+    """
+    try:
+        # Create parser with custom chunk settings if provided
+        parser = PDFParserTool(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        document = parser.parse_pdf(file_path)
+        
+        if document is None:
+            return {"error": f"Failed to parse PDF file: {file_path}"}
+        
+        # Convert ParsedDocument to dictionary
+        return {
+            "title": document.title,
+            "total_pages": document.total_pages,
+            "chunks": [
+                {
+                    "content": chunk.content,
+                    "page_number": chunk.page_number,
+                    "chunk_index": chunk.chunk_index,
+                    "metadata": chunk.metadata
+                }
+                for chunk in document.chunks
+            ],
+            "metadata": document.metadata,
+            "extraction_timestamp": document.extraction_timestamp.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error in parse_pdf tool: {e}")
+        return {"error": f"PDF parsing failed: {str(e)}"}
+
+@tool(
+    description="Extract financial metrics from a parsed PDF document. Searches for revenue, profit, EPS, P/E ratio, market cap, debt, cash, and other financial metrics. Returns categorized metrics with page references and context. Useful for extracting key financial data from annual reports and financial statements.",
+    infer_schema=True,
+    parse_docstring=False
+)
+def extract_financial_metrics_from_pdf(file_path: str) -> Dict[str, Any]:
+    """
+    Extract financial metrics from a PDF document.
+    
+    Parses the PDF and searches for common financial metrics including revenue, profit,
+    EPS, P/E ratio, market cap, debt, and cash.
+    
+    Args:
+        file_path: Path to the PDF file to analyze.
+    
+    Returns:
+        Dictionary containing extracted metrics organized by category: revenue, profit,
+        eps, pe_ratio, market_cap, debt, and cash (each as a list).
+        Returns dictionary with 'error' key if extraction fails.
+    """
+    try:
+        parser = PDFParserTool()
+        document = parser.parse_pdf(file_path)
+        
+        if document is None:
+            return {"error": f"Failed to parse PDF file: {file_path}"}
+        
+        metrics = parser.extract_financial_metrics(document)
+        return metrics
+    except Exception as e:
+        logger.error(f"Error extracting financial metrics: {e}")
+        return {"error": f"Financial metrics extraction failed: {str(e)}"}

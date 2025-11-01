@@ -16,6 +16,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.colors import HexColor
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
@@ -394,3 +395,52 @@ class PDFGeneratorTool:
         except Exception as e:
             logger.error(f"Error getting PDF info: {e}")
             return {"error": str(e)}
+
+# Global PDF generator instance
+_pdf_generator = PDFGeneratorTool()
+
+@tool(
+    description="Convert markdown content to professional PDF format. Generates professionally formatted PDF documents from markdown text with proper styling, headers, sections, and layout. Essential for creating final stock research reports in PDF format.",
+    infer_schema=True,
+    parse_docstring=False
+)
+def generate_pdf_from_markdown(
+    markdown_content: str,
+    output_filename: Optional[str] = None,
+    stock_symbol: Optional[str] = None,
+    output_dir: str = "reports"
+) -> Dict[str, Any]:
+    """
+    Convert markdown content to professional PDF format.
+    
+    Generates professionally formatted PDF documents from markdown text with proper styling,
+    headers, sections, and layout.
+    
+    Args:
+        markdown_content: Markdown text content to convert to PDF.
+        output_filename: Optional custom filename for the PDF.
+        stock_symbol: Optional stock symbol to include in auto-generated filename.
+        output_dir: Directory where PDF will be saved (default: "reports").
+    
+    Returns:
+        Dictionary containing success, pdf_path, filename, output_dir, and error (if failed).
+    """
+    try:
+        generator = PDFGeneratorTool(output_dir=output_dir)
+        pdf_path = generator.generate_pdf(markdown_content, output_filename, stock_symbol)
+        
+        return {
+            "success": True,
+            "pdf_path": pdf_path,
+            "filename": os.path.basename(pdf_path),
+            "output_dir": output_dir
+        }
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        return {
+            "success": False,
+            "error": f"PDF generation failed: {str(e)}",
+            "pdf_path": None,
+            "filename": None,
+            "output_dir": output_dir
+        }

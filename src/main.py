@@ -1,56 +1,41 @@
 """
-Main entry point for Stock Report Generator.
-Provides a command-line interface for generating equity research reports using LangGraph.
+Main entry point for the Agentic Stock Research Report Generator.
+Autonomous Multi-Agent System using LangGraph + LangChain.
 
-Copyright (c) 2025 Stock Report Generator. All rights reserved.
+This system uses three autonomous agents that collaborate to generate
+comprehensive stock research reports for NSE stocks.
 """
 
 import asyncio
 import logging
-import argparse
 import sys
-from typing import Dict, Any, Optional
-from datetime import datetime
-import json
 import os
+import argparse
+from typing import Dict, Any, Optional
+
+# Add src to path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 try:
     # Try relative imports first (when run as module)
     from .config import Config
-    from .graph.context_manager_mcp import MCPContextManager
-    from .graph.stock_report_graph import StockReportGraph
-    from .tools.web_search_tool import WebSearchTool
-    from .tools.stock_data_tool import StockDataTool
-    from .tools.report_fetcher_tool import ReportFetcherTool
-    from .tools.pdf_parser_tool import PDFParserTool
-    from .tools.summarizer_tool import SummarizerTool
-    from .tools.report_formatter_tool import ReportFormatterTool
-    from .tools.pdf_generator_tool import PDFGeneratorTool
-    # LangGraph imports
-    from .agents.langgraph_dynamic_agent_simple import LangGraphDynamicAgentSimple as LangGraphDynamicAgent
-
+    from .graph.multi_agent_graph import MultiAgentOrchestrator
+    from .tools.stock_data_tool import validate_symbol as tool_validate_symbol
+    from .tools.stock_data_tool import get_company_info as tool_get_company_info
 except ImportError:
     # Fall back to absolute imports (when run as script)
     from config import Config
-    from graph.context_manager_mcp import MCPContextManager
-    from graph.stock_report_graph import StockReportGraph
-    from tools.web_search_tool import WebSearchTool
-    from tools.stock_data_tool import StockDataTool
-    from tools.report_fetcher_tool import ReportFetcherTool
-    from tools.pdf_parser_tool import PDFParserTool
-    from tools.summarizer_tool import SummarizerTool
-    from tools.report_formatter_tool import ReportFormatterTool
-    from tools.pdf_generator_tool import PDFGeneratorTool
-    # LangGraph imports
-    from agents.langgraph_dynamic_agent_simple import LangGraphDynamicAgentSimple as LangGraphDynamicAgent
+    from graph.multi_agent_graph import MultiAgentOrchestrator
+    from tools.stock_data_tool import validate_symbol as tool_validate_symbol
+    from tools.stock_data_tool import get_company_info as tool_get_company_info
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('stock_report_generator.log')
+        logging.FileHandler('stock_report_generator.log'),
+        logging.StreamHandler(sys.stdout)
     ]
 )
 
@@ -58,709 +43,285 @@ logger = logging.getLogger(__name__)
 
 class StockReportGenerator:
     """
-    Main class for generating comprehensive stock reports using LangGraph.
+    Main class for the Agentic Stock Research Report Generator.
+    
+    This system uses three autonomous agents:
+    1. ResearchAgent - Gathers company information, sector overview, and peer data
+    2. AnalysisAgent - Performs financial, management, and technical analysis  
+    3. ReportAgent - Synthesizes all data into comprehensive reports
     """
     
-    def __init__(self):
-        """Initialize the Stock Report Generator."""
-        self.config = Config()
-        self.mcp_context = None
-        self.workflow_graph = None
-        self.tools = {}
-        self.langgraph_agent = None
-
-    def initialize(self) -> bool:
+    def __init__(self, openai_api_key: Optional[str] = None):
         """
-        Initialize the system components.
+        Initialize the Stock Report Generator.
         
+        Args:
+            openai_api_key: OpenAI API key (if not provided, will use config)
+        """
+        self.openai_api_key = openai_api_key or Config.OPENAI_API_KEY
+        
+        if not self.openai_api_key:
+            raise ValueError("OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it directly.")
+        
+        # Initialize the multi-agent orchestrator
+        self.orchestrator = MultiAgentOrchestrator(self.openai_api_key)
+        
+        logger.info("Stock Report Generator initialized successfully")
+    
+    async def generate_report(
+        self,
+        stock_symbol: str,
+        company_name: Optional[str] = None,
+        sector: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a comprehensive stock research report.
+        
+        Args:
+            stock_symbol: NSE stock symbol (e.g., 'RELIANCE', 'TCS')
+            company_name: Full company name (optional, will be fetched if not provided)
+            sector: Sector name (optional, will be fetched if not provided)
+            
         Returns:
-            True if initialization successful, False otherwise
+            Dictionary containing the generated report and metadata
         """
         try:
-            logger.info("Initializing Stock Report Generator...")
+            logger.info(f"Starting report generation for {stock_symbol}")
             
-            # Validate configuration
-            config_validation = self.config.validate_config()
-            if not all(config_validation.values()):
-                logger.error("Configuration validation failed:")
-                for key, value in config_validation.items():
-                    if not value:
-                        logger.error(f"  - {key}: Missing or invalid")
-                return False
-                
-            # Initialize MCP context
-            self.mcp_context = MCPContextManager(
-                max_context_size=self.config.MCP_CONTEXT_SIZE
+            # Validate inputs
+            if not stock_symbol:
+                raise ValueError("Stock symbol is required")
+            
+            # Clean stock symbol (remove .NS suffix if present)
+            if stock_symbol.endswith('.NS'):
+                stock_symbol = stock_symbol[:-3]
+            
+            # Validate symbol against NSE via tool
+            validation = tool_validate_symbol.invoke({"symbol": stock_symbol})
+            if not validation or not validation.get("valid", False):
+                raise ValueError(validation.get("error", "Symbol not found on NSE"))
+            # Fetch company info from tool to populate missing fields
+            info = tool_get_company_info.invoke({"symbol": stock_symbol}) or {}
+            if not company_name:
+                company_name = info.get("company_name") or info.get("short_name") or validation.get("company_name") or f"Company {stock_symbol}"
+            if not sector:
+                sector = info.get("sector") or validation.get("sector") or "Unknown"
+            
+            # Run the multi-agent workflow
+            results = await self.orchestrator.run_workflow(
+                stock_symbol=stock_symbol,
+                company_name=company_name,
+                sector=sector
             )
             
-            # Initialize tools
-            self._initialize_tools()
+            # Log results
+            if results["workflow_status"] == "completed":
+                logger.info(f"Successfully generated report for {stock_symbol}")
+                if results.get("pdf_path"):
+                    logger.info(f"PDF report saved to: {results['pdf_path']}")
+            else:
+                logger.warning(f"Report generation completed with errors for {stock_symbol}")
+                if results.get("errors"):
+                    logger.warning(f"Errors: {results['errors']}")
             
-            # Initialize workflow graph
-            self._initialize_workflow()
-            
-            # Initialize LangGraph agent system
-            self._initialize_langgraph_agent_system()
-            
-            logger.info("Stock Report Generator initialized successfully")
-            return True
+            return results
             
         except Exception as e:
-            logger.error(f"Failed to initialize Stock Report Generator: {e}")
+            logger.error(f"Report generation failed for {stock_symbol}: {e}")
+            return {
+                "stock_symbol": stock_symbol,
+                "workflow_status": "failed",
+                "error": str(e),
+                "errors": [str(e)]
+            }
+    
+    def generate_report_sync(
+        self,
+        stock_symbol: str,
+        company_name: Optional[str] = None,
+        sector: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Synchronous wrapper for generate_report.
+        
+        Args:
+            stock_symbol: NSE stock symbol
+            company_name: Full company name (optional)
+            sector: Sector name (optional)
+            
+        Returns:
+            Dictionary containing the generated report and metadata
+        """
+        return asyncio.run(self.generate_report(stock_symbol, company_name, sector))
+    
+    # Deprecated hard-coded helpers removed in favor of live NSE validation via tools
+
+def export_graph_diagram(orchestrator, output_path: str) -> bool:
+    """
+    Export the MultiAgentOrchestrator graph diagram to an image file.
+    
+    Args:
+        orchestrator: MultiAgentOrchestrator instance
+        output_path: Path where the graph image should be saved
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        graph = orchestrator.graph.get_graph()
+        
+        # Try to export as PNG using graphviz
+        try:
+            png_data = graph.draw_png()
+            if png_data:
+                with open(output_path, 'wb') as f:
+                    f.write(png_data)
+                logger.info(f"Graph diagram exported to {output_path}")
+                print(f"✅ Graph diagram exported to {output_path}")
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to export as PNG (graphviz may not be installed): {e}")
+        
+        # Fallback to Mermaid format
+        try:
+            mermaid_diagram = graph.draw_mermaid()
+            if mermaid_diagram:
+                # Save as .mmd file (mermaid format)
+                if '.' in output_path:
+                    mmd_path = output_path.rsplit('.', 1)[0] + '.mmd'
+                else:
+                    mmd_path = output_path + '.mmd'
+                with open(mmd_path, 'w') as f:
+                    f.write(mermaid_diagram)
+                logger.info(f"Graph diagram exported as Mermaid format to {mmd_path}")
+                print(f"✅ Graph diagram exported as Mermaid format to {mmd_path}")
+                print(f"   (Install graphviz to export as PNG. Mermaid can be viewed at https://mermaid.live/)")
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to export as Mermaid: {e}")
+        
+        # Last resort: ASCII representation
+        try:
+            ascii_diagram = graph.draw_ascii()
+            if ascii_diagram:
+                if '.' in output_path:
+                    txt_path = output_path.rsplit('.', 1)[0] + '.txt'
+                else:
+                    txt_path = output_path + '.txt'
+                with open(txt_path, 'w') as f:
+                    f.write(ascii_diagram)
+                logger.info(f"Graph diagram exported as ASCII to {txt_path}")
+                print(f"✅ Graph diagram exported as ASCII to {txt_path}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to export graph diagram: {e}")
             return False
             
-    def _initialize_tools(self) -> None:
-        """Initialize all tools."""
-        try:
-            # Web Search Tool (DuckDuckGo - no API key required)
-            self.tools['web_search'] = WebSearchTool(
-                max_results=10
-            )
-            
-            # Stock Data Tool (Yahoo Finance - no API key required)
-            self.tools['stock_data'] = StockDataTool()
-            
-            # Report Fetcher Tool
-            self.tools['report_fetcher'] = ReportFetcherTool()
-            
-            # PDF Parser Tool
-            self.tools['pdf_parser'] = PDFParserTool()
-            
-            # Summarizer Tool
-            self.tools['summarizer'] = SummarizerTool(
-                api_key=self.config.OPENAI_API_KEY,
-                model=self.config.DEFAULT_MODEL
-            )
-            
-            # Report Formatter Tool
-            self.tools['report_formatter'] = ReportFormatterTool()
-            
-            # PDF Generator Tool
-            self.tools['pdf_generator'] = PDFGeneratorTool()
-            
-            logger.info("All tools initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Error initializing tools: {e}")
-            raise
-    
-    def _initialize_workflow(self) -> None:
-        """Initialize the workflow graph."""
-        try:
-            self.workflow_graph = StockReportGraph(
-                mcp_context=self.mcp_context,
-                web_search_tool=self.tools['web_search'],
-                stock_data_tool=self.tools['stock_data'],
-                report_fetcher_tool=self.tools['report_fetcher'],
-                pdf_parser_tool=self.tools['pdf_parser'],
-                summarizer_tool=self.tools['summarizer'],
-                report_formatter_tool=self.tools['report_formatter'],
-                openai_api_key=self.config.OPENAI_API_KEY
-            )
-            logger.info("Workflow graph initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Error initializing workflow graph: {e}")
-            raise
-    
-    def _initialize_langgraph_agent_system(self) -> None:
-        """Initialize the LangGraph agent system."""
-        try:
-            # Initialize LangGraph agent
-            self.langgraph_agent = LangGraphDynamicAgent(
-                agent_id="langgraph_stock_analyzer",
-                mcp_context=self.mcp_context,
-                stock_data_tool=self.tools['stock_data'],
-                web_search_tool=self.tools['web_search'],
-                summarizer_tool=self.tools['summarizer'],
-                openai_api_key=self.config.OPENAI_API_KEY,
-                model=self.config.DEFAULT_MODEL
-            )
-            
-            logger.info("LangGraph agent system initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Error initializing LangGraph agent system: {e}")
-            # Don't raise - LangGraph system is optional
-            self.langgraph_agent = None
-            
-    async def generate_report(self, stock_symbol: str) -> Dict[str, Any]:
-        """
-        Generate a comprehensive stock report using traditional workflow.
-        
-        Args:
-            stock_symbol: NSE stock symbol (e.g., 'RELIANCE')
-            
-        Returns:
-            Dictionary containing the generated report and metadata
-        """
-        try:
-            logger.info(f"Starting traditional report generation for {stock_symbol}")
-            
-            # Get company name and sector automatically
-            logger.info(f"Fetching company information for {stock_symbol}")
-            try:
-                company_info = self.tools['stock_data'].get_company_name_and_sector(stock_symbol)
-                company_name = company_info.company_name
-                sector = company_info.sector
-            except Exception as e:
-                logger.warning(f"Could not get company info: {e}")
-                company_name = stock_symbol
-                sector = "Unknown"
-            
-            logger.info(f"Found: {company_name} in {sector} sector")
-            
-            # Execute the workflow
-            result = await self.workflow_graph.run_workflow(stock_symbol, company_name, sector)
-            
-            if result.get("final_report") and not result.get("errors"):
-                logger.info(f"Traditional report generated successfully for {stock_symbol}")
-                return {
-                    "success": True,
-                    "stock_symbol": stock_symbol,
-                    "company_name": company_name,
-                    "sector": sector,
-                    "report_type": "traditional",
-                    "generated_at": datetime.now().isoformat(),
-                    "report_path": result.get("final_report", {}).get("report_path"),
-                    **result
-                }
-            else:
-                logger.error(f"Traditional report generation failed for {stock_symbol}")
-                return {
-                    "success": False,
-                    "error": result.get("errors", ["Unknown error"])[0] if result.get("errors") else "Unknown error",
-                    "stock_symbol": stock_symbol
-                }
-                
-        except Exception as e:
-            logger.error(f"Error generating traditional report for {stock_symbol}: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "stock_symbol": stock_symbol
-            }
-    
-    async def generate_langgraph_report(self, stock_symbol: str) -> Dict[str, Any]:
-        """
-        Generate a stock report using the LangGraph agent system.
-        
-        Args:
-            stock_symbol: NSE stock symbol (e.g., 'RELIANCE')
-            
-        Returns:
-            Dictionary containing the generated report and metadata
-        """
-        try:
-            if not self.langgraph_agent:
-                return {
-                    "success": False,
-                    "error": "LangGraph agent system not initialized",
-                    "stock_symbol": stock_symbol
-                }
-            
-            logger.info(f"Starting LangGraph report generation for {stock_symbol}")
-            
-            # Get company name and sector automatically
-            logger.info(f"Fetching company information for {stock_symbol}")
-            try:
-                company_info = self.tools['stock_data'].get_company_name_and_sector(stock_symbol)
-                company_name = company_info.company_name
-                sector = company_info.sector
-            except Exception as e:
-                logger.warning(f"Could not get company info: {e}")
-                company_name = stock_symbol
-                sector = "Unknown"
-            
-            logger.info(f"Found: {company_name} in {sector} sector")
-            
-            # Perform LangGraph analysis
-            analysis_result = await self.langgraph_agent.analyze_stock(stock_symbol)
-            
-            if not analysis_result.get("success", False):
-                return {
-                    "success": False,
-                    "error": f"LangGraph analysis failed: {analysis_result.get('error', 'Unknown error')}",
-                    "stock_symbol": stock_symbol
-                }
-            
-            # Generate recommendations
-            recommendations_result = await self.langgraph_agent.generate_recommendations(stock_symbol)
-            
-            if not recommendations_result.get("success", False):
-                logger.warning(f"LangGraph recommendations failed: {recommendations_result.get('error', 'Unknown error')}")
-                # Continue with analysis results only
-            
-            # Get structured data from analysis
-            structured_data = analysis_result.get("structured_data", {})
-            
-            # Also parse recommendations for additional structured data
-            if recommendations_result.get("success", False):
-                recommendations_text = recommendations_result.get("recommendations", "")
-                if recommendations_text:
-                    recommendations_structured = self.langgraph_agent._parse_structured_analysis(recommendations_text)
-                    logger.debug(f"Recommendations structured data: {recommendations_structured}")
-                    # Merge recommendations structured data (it's more likely to have the final ratings)
-                    for key, value in recommendations_structured.items():
-                        if value != "N/A" and value != []:
-                            structured_data[key] = value
-                            logger.debug(f"Merged {key}: {value}")
-                    logger.debug(f"Final merged structured data: {structured_data}")
-            
-            # Format the report
-            report_data = {
-                "stock_symbol": stock_symbol,
-                "company_name": company_name,
-                "sector": sector,
-                "analysis": analysis_result.get("analysis", ""),
-                "recommendations": recommendations_result.get("recommendations", ""),
-                "structured_data": structured_data,
-                "agent_id": self.langgraph_agent.agent_id,
-                "report_type": "langgraph",
-                "generated_at": datetime.now().isoformat()
-            }
-            
-            # Generate markdown report
-            markdown_content = self._format_langgraph_report(report_data)
-            
-            # Save markdown report
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            markdown_filename = f"reports/langgraph_stock_report_{stock_symbol}_{timestamp}.md"
-            os.makedirs(os.path.dirname(markdown_filename), exist_ok=True)
-            
-            with open(markdown_filename, 'w', encoding='utf-8') as f:
-                f.write(markdown_content)
-            
-            logger.info(f"LangGraph report saved to {markdown_filename}")
-            
-            # Generate PDF report
-            pdf_filename = f"stock_report_{stock_symbol}_{timestamp}.pdf"
-            pdf_result = self.tools['pdf_generator'].generate_pdf(
-                markdown_content=markdown_content,
-                output_filename=pdf_filename,
-                stock_symbol=stock_symbol
-            )
-            
-            if pdf_result:
-                logger.info(f"LangGraph PDF report generated: {pdf_result}")
-            else:
-                logger.warning(f"Failed to generate PDF")
-            
-            return {
-                "success": True,
-                "stock_symbol": stock_symbol,
-                "company_name": company_name,
-                "sector": sector,
-                "report_type": "langgraph",
-                "markdown_file": markdown_filename,
-                "pdf_file": pdf_result if pdf_result else None,
-                "analysis": analysis_result.get("analysis", ""),
-                "recommendations": recommendations_result.get("recommendations", ""),
-                "structured_data": structured_data,
-                "generated_at": datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"Error generating LangGraph report for {stock_symbol}: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "stock_symbol": stock_symbol
-            }
-    
-    def _format_langgraph_report(self, report_data: Dict[str, Any]) -> str:
-        """Format LangGraph report data into markdown."""
-        structured_data = report_data.get('structured_data', {})
-        
-        # Format key strengths and risks
-        strengths_text = ""
-        if structured_data.get('key_strengths'):
-            strengths_text = "\n".join([f"- {strength}" for strength in structured_data['key_strengths']])
-        
-        risks_text = ""
-        if structured_data.get('key_risks'):
-            risks_text = "\n".join([f"- {risk}" for risk in structured_data['key_risks']])
-        
-        return f"""# LangGraph Stock Analysis Report
-
-## 📊 Stock Information
-- **Symbol**: {report_data['stock_symbol']}
-- **Company**: {report_data['company_name']}
-- **Sector**: {report_data['sector']}
-- **Analysis Type**: LangGraph LLM-Driven Analysis
-- **Generated**: {report_data['generated_at']}
-
-## 🎯 Investment Summary
-- **Investment Rating**: {structured_data.get('investment_rating', 'N/A')}
-- **Confidence Score**: {structured_data.get('confidence_score', 'N/A')}/10
-- **Market Sentiment**: {structured_data.get('market_sentiment', 'N/A')}
-- **Target Price**: {structured_data.get('target_price', 'N/A')}
-
-## 🔍 Detailed Analysis
-{report_data['analysis']}
-
-## 🎯 Investment Recommendations
-{report_data['recommendations']}
-
-## 💪 Key Strengths
-{strengths_text if strengths_text else "Not specified"}
-
-## ⚠️ Key Risks
-{risks_text if risks_text else "Not specified"}
-
-## 📈 Peer Comparison
-{structured_data.get('peer_comparison', 'Not available')}
-
----
-*Report generated by LangGraph Stock Analysis System*
-"""
-    
-    def export_workflow_data(self, stock_symbol: str) -> Dict[str, Any]:
-        """
-        Export workflow data for analysis.
-        
-        Args:
-            stock_symbol: Stock symbol
-            
-        Returns:
-            Export result
-        """
-        try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            export_filename = f"exports/workflow_data_{stock_symbol}_{timestamp}.json"
-            
-            # Create exports directory if it doesn't exist
-            os.makedirs(os.path.dirname(export_filename), exist_ok=True)
-            
-            # Get workflow data
-            workflow_data = {
-                "stock_symbol": stock_symbol,
-                "timestamp": timestamp,
-                "config": {
-                    "openai_api_key": "***REDACTED***",
-                    "default_model": self.config.DEFAULT_MODEL,
-                    "mcp_context_size": self.config.MCP_CONTEXT_SIZE
-                },
-                "tools": list(self.tools.keys()),
-                "langgraph_available": self.langgraph_agent is not None
-            }
-            
-            with open(export_filename, 'w', encoding='utf-8') as f:
-                json.dump(workflow_data, f, indent=2, ensure_ascii=False)
-            
-            logger.info(f"Workflow data exported to {export_filename}")
-            
-            return {
-                "success": True,
-                "export_file": export_filename,
-                "data": workflow_data
-            }
-            
-        except Exception as e:
-            logger.error(f"Error exporting workflow data: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    def print_langgraph_workflow(self, format_type: str = "ascii"):
-        """Print LangGraph workflow visualization using LangGraph's built-in visualization methods."""
-        try:
-            if not self.langgraph_agent:
-                print("❌ LangGraph agent not initialized")
-                return
-            
-            print("🤖 LangGraph Dynamic Agent Workflow Visualization:")
-            print("=" * 60)
-            print()
-            
-            # Get the compiled graph from the agent
-            # Note: The current implementation uses LangChain's create_agent which doesn't directly expose a graph
-            # We'll need to create a proper LangGraph workflow to use the visualization features
-            print("⚠️  Note: Current LangGraph agent uses LangChain's create_agent() which doesn't expose graph visualization.")
-            print("    To use graph.get_graph().draw_ascii() and draw_mermaid(), we need a proper LangGraph workflow.")
-            print()
-            
-            # For now, show the traditional workflow description
-            print("📊 Current LangGraph Agent Architecture:")
-            print("    ├── LangGraphDynamicAgentSimple class")
-            print("    ├── create_agent() from langchain.agents")
-            print("    ├── ChatOpenAI LLM integration")
-            print("    ├── 5 LangChain tools (@tool decorators)")
-            print("    └── MCPContextManager for shared memory")
-            print()
-            
-            print("🔄 Execution Flow:")
-            print("    Input: Stock Symbol")
-            print("    ↓")
-            print("    analyze_stock() → agent.invoke() → Tool Selection & Execution")
-            print("    ↓")
-            print("    generate_recommendations() → agent.invoke() → Final Analysis")
-            print("    ↓")
-            print("    Output: Structured Investment Report")
-            print()
-            
-            print("🛠️  Available Tools:")
-            print("    • get_stock_data(symbol) - Financial metrics")
-            print("    • get_company_info(symbol) - Company profile")
-            print("    • search_web(query) - Market research")
-            print("    • summarize_text(text) - AI summarization")
-            print("    • get_peer_comparison(symbol) - Industry analysis")
-            print()
-            
-            print("💡 To enable proper graph visualization, consider migrating to a full LangGraph workflow")
-            print("    with StateGraph instead of LangChain's create_agent().")
-            
-        except Exception as e:
-            print(f"❌ Error printing LangGraph workflow: {e}")
-    
-    def print_agent_workflow_graph(self, format_type: str = "ascii"):
-        """Print default agent workflow graph using LangGraph's built-in visualization methods."""
-        try:
-            if not self.workflow_graph:
-                print("❌ Default workflow graph not initialized")
-                return
-            
-            print("🏗️  Traditional Multi-Agent Workflow Visualization:")
-            print("=" * 60)
-            print()
-            
-            # Use LangGraph's built-in visualization
-            try:
-                if format_type.lower() == "mermaid":
-                    print("📊 Mermaid Diagram:")
-                    print("-" * 40)
-                    mermaid_diagram = self.workflow_graph.get_graph().draw_mermaid()
-                    print(mermaid_diagram)
-                    print("-" * 40)
-                else:
-                    print("📊 ASCII Diagram:")
-                    print("-" * 40)
-                    ascii_diagram = self.workflow_graph.get_graph().draw_ascii()
-                    print(ascii_diagram)
-                    print("-" * 40)
-                
-                print()
-                print("🔧 Graph Details:")
-                print(f"    • Graph Type: {type(self.workflow_graph).__name__}")
-                print(f"    • Nodes: {len(self.workflow_graph.get_graph().nodes)}")
-                print(f"    • Edges: {len(self.workflow_graph.get_graph().edges)}")
-                print()
-                
-            except Exception as viz_error:
-                print(f"⚠️  Could not generate {format_type} visualization: {viz_error}")
-                print("    Falling back to text description...")
-                print()
-                
-                # Fallback to text description
-                print("📊 Workflow Structure:")
-                print("    Input: Stock Symbol")
-                print("    ↓")
-                print("    parallel_analysis (Sector + Stock + Management)")
-                print("    ↓")
-                print("    swot_analysis")
-                print("    ↓")
-                print("    report_reviewer")
-                print("    ↓")
-                print("    Output: Comprehensive Stock Report")
-                print()
-            
-            print("🛠️  Agent Classes:")
-            print("    • SectorResearcherAgent - analyze_sector() method")
-            print("    • StockResearcherAgent - analyze_stock() method")
-            print("    • ManagementAnalysisAgent - analyze_management() method")
-            print("    • SWOTAnalysisAgent - analyze_swot() method")
-            print("    • ReportReviewerAgent - review_report() method")
-            print()
-            
-            print("🛠️  Tool Classes:")
-            print("    • StockDataTool - get_stock_metrics(), get_company_info()")
-            print("    • WebSearchTool - search_sector_news(), search_company_news()")
-            print("    • ReportFetcherTool - fetch_reports()")
-            print("    • PDFParserTool - parse_pdf()")
-            print("    • SummarizerTool - summarize()")
-            print("    • ReportFormatterTool - format_report(), generate_final_report()")
-            print("    • PDFGeneratorTool - generate_pdf()")
-            print()
-            
-            print("🎯 Key Features:")
-            print("    • Fixed-sequence multi-agent pipeline")
-            print("    • Parallel agent execution for efficiency")
-            print("    • Specialized agent roles with dedicated methods")
-            print("    • State-based workflow management")
-            print("    • Comprehensive sector & management analysis")
-            print("    • Quality review & validation process")
-            
-        except Exception as e:
-            print(f"❌ Error printing agent workflow graph: {e}")
+    except Exception as e:
+        logger.error(f"Error exporting graph diagram: {e}")
+        print(f"❌ Failed to export graph diagram: {e}")
+        return False
 
 async def main():
-    """Main function for command-line interface."""
-    parser = argparse.ArgumentParser(
-        description="Stock Report Generator for NSE using LangGraph",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python main.py --symbol RELIANCE
-  python main.py --symbol TCS
-  python main.py --symbol HDFCBANK
-  python main.py --symbol INFY --output-dir my_reports
-  python main.py --symbol RELIANCE --langgraph
-  python main.py --symbol TCS --langgraph --verbose
-  python main.py --print-langgraph
-  python main.py --print-agent-graph
-  python main.py --print-agent-graph --format mermaid
-  python main.py --print-langgraph --format ascii
-        """
-    )
-    
-    parser.add_argument(
-        "--symbol",
-        help="NSE stock symbol (e.g., RELIANCE, TCS, HDFCBANK) - company name and sector will be fetched automatically"
-    )
-    
-    parser.add_argument(
-        "--output-dir",
-        default="reports",
-        help="Output directory for generated reports (default: reports)"
-    )
-    
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging"
-    )
-    
-    parser.add_argument(
-        "--export-data",
-        action="store_true",
-        help="Export workflow data after generation"
-    )
-
-    parser.add_argument(
-        "--langgraph",
-        action="store_true",
-        help="Use LangGraph framework for intelligent tool execution (default)"
-    )
-    
-    parser.add_argument(
-        "--print-langgraph",
-        action="store_true",
-        help="Print LangGraph workflow visualization"
-    )
-    
-    parser.add_argument(
-        "--print-agent-graph",
-        action="store_true",
-        help="Print default agent workflow graph"
-    )
-    
-    parser.add_argument(
-        "--format",
-        choices=["ascii", "mermaid"],
-        default="ascii",
-        help="Visualization format for graph printing (default: ascii)"
-    )
-    
-    args = parser.parse_args()
-    
-    # Validate arguments
-    if not args.print_langgraph and not args.print_agent_graph:
-        if not args.symbol:
-            parser.error("--symbol is required when not printing graphs")
-    
-    # Set logging level
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
-    # Create generator instance
-    generator = StockReportGenerator()
-    
-    if not generator.initialize():
-        logger.error("Failed to initialize Stock Report Generator")
-        sys.exit(1)
-    
-    # Handle graph printing requests
-    if args.print_langgraph:
-        print("\n🔍 LangGraph Workflow Visualization:")
-        print("=" * 50)
-        generator.print_langgraph_workflow(format_type=args.format)
-        print("=" * 50)
-        return
-    
-    if args.print_agent_graph:
-        print("\n🔍 Default Agent Workflow Graph:")
-        print("=" * 50)
-        generator.print_agent_workflow_graph(format_type=args.format)
-        print("=" * 50)
-        return
-        
+    """Main function for command-line usage."""
     try:
-        # Generate the report
-        if args.langgraph:
-            logger.info(f"Generating LangGraph report for {args.symbol}")
-            result = await generator.generate_langgraph_report(
-                stock_symbol=args.symbol.upper()
-            )
-        else:
-            logger.info(f"Generating traditional report for {args.symbol}")
-            result = await generator.generate_report(
-                stock_symbol=args.symbol.upper()
-            )
+        # Parse command line arguments
+        parser = argparse.ArgumentParser(
+            description='Generate stock research reports using multi-agent AI system',
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
+Examples:
+  python main.py RELIANCE
+  python main.py RELIANCE "Reliance Industries" "Oil & Gas"
+  python main.py RELIANCE --export-graph graph.png
+  python main.py --export-graph-only graph.png
+            """
+        )
+        parser.add_argument('stock_symbol', nargs='?', help='NSE stock symbol (e.g., RELIANCE, TCS)')
+        parser.add_argument('company_name', nargs='?', help='Full company name (optional, will be fetched if not provided)')
+        parser.add_argument('sector', nargs='?', help='Sector name (optional, will be fetched if not provided)')
+        parser.add_argument('--export-graph', '--graph-output', dest='graph_output', 
+                          help='Export the multi-agent graph diagram to the specified file path (e.g., graph.png)')
+        parser.add_argument('--export-graph-only', dest='export_graph_only',
+                          help='Only export the graph diagram without generating a report (specify output path)')
         
-        if result["success"]:
-            report_type = result.get('report_type', 'traditional')
-            print(f"\n✅ Report generated successfully!")
-            print(f"📊 Stock: {result['stock_symbol']}")
-            print(f"🏢 Company: {result.get('company_name', 'N/A')}")
-            print(f"🏭 Sector: {result.get('sector', 'N/A')}")
-            if report_type == 'langgraph':
-                print(f"🤖 Report Type: LangGraph LLM-Driven")
-            else:
-                print(f"🤖 Report Type: Traditional Fixed-Sequence")
+        args = parser.parse_args()
+        
+        # Check configuration
+        config_validation = Config.validate_config()
+        if not config_validation["openai_key"]:
+            print("Error: OpenAI API key not found. Please set OPENAI_API_KEY environment variable.")
+            sys.exit(1)
+        
+        # Initialize the generator
+        generator = StockReportGenerator()
+        
+        # Handle graph export only mode
+        if args.export_graph_only:
+            print(f"Exporting graph diagram to {args.export_graph_only}...")
+            success = export_graph_diagram(generator.orchestrator, args.export_graph_only)
+            sys.exit(0 if success else 1)
+        
+        # Check if stock symbol is provided
+        if not args.stock_symbol:
+            parser.print_help()
+            sys.exit(1)
+        
+        stock_symbol = args.stock_symbol.upper()
+        company_name = args.company_name
+        sector = args.sector
+        
+        # Export graph if requested
+        if args.graph_output:
+            print(f"Exporting graph diagram to {args.graph_output}...")
+            export_graph_diagram(generator.orchestrator, args.graph_output)
+            print()
+        
+        # Leave company_name/sector None to auto-populate using tools in generate_report
+        
+        print(f"Generating report for {company_name or stock_symbol} ({stock_symbol}) in {sector or 'unknown'} sector...")
+        print("This may take a few minutes as the AI agents gather and analyze data...")
+        
+        # Generate the report
+        results = await generator.generate_report(stock_symbol, company_name, sector)
+        
+        # Display results
+        print("\n" + "="*60)
+        print("REPORT GENERATION COMPLETED")
+        print("="*60)
+        
+        if results["workflow_status"] == "completed":
+            print(f"✅ Successfully generated report for {stock_symbol}")
+            print(f"📊 Company: {results.get('company_name', 'N/A')}")
+            print(f"🏢 Sector: {results.get('sector', 'N/A')}")
+            print(f"⏱️  Duration: {results.get('duration_seconds', 0):.2f} seconds")
             
-            # Show file paths
-            if 'markdown_file' in result:
-                print(f"📄 Markdown report: {result['markdown_file']}")
-            if 'pdf_file' in result and result['pdf_file']:
-                print(f"📋 PDF report: {result['pdf_file']}")
-            if 'report_path' in result:
-                print(f"📄 Report: {result['report_path']}")
+            if results.get("pdf_path"):
+                print(f"📄 PDF Report: {results['pdf_path']}")
             
-            print(f"⏱️  Generated at: {result['generated_at']}")
-            
-            # Show additional info for LangGraph reports
-            if report_type == 'langgraph':
-                structured_data = result.get('structured_data', {})
-                print(f"🎯 Investment Rating: {structured_data.get('investment_rating', 'N/A')}")
-                print(f"🎯 Confidence Score: {structured_data.get('confidence_score', 'N/A')}")
-                print(f"📊 Market Sentiment: {structured_data.get('market_sentiment', 'N/A')}")
-                if structured_data.get('target_price', 'N/A') != 'N/A':
-                    print(f"💰 Target Price: {structured_data.get('target_price', 'N/A')}")
-                if structured_data.get('peer_comparison', 'N/A') != 'N/A':
-                    print(f"📈 Peer Comparison: Available in report")
-            
-            # Export data if requested
-            if args.export_data:
-                export_result = generator.export_workflow_data(args.symbol.upper())
-                if export_result.get("success", False):
-                    print(f"📊 Workflow data exported: {export_result['export_file']}")
-                else:
-                    print(f"❌ Failed to export workflow data: {export_result.get('error', 'Unknown error')}")
+            if results.get("final_report"):
+                print("\n📋 Report Preview (first 500 characters):")
+                print("-" * 40)
+                print(results["final_report"][:500] + "..." if len(results["final_report"]) > 500 else results["final_report"])
+                print("-" * 40)
             
         else:
-            print(f"\n❌ Report generation failed!")
-            print(f"📊 Stock: {result['stock_symbol']}")
-            print(f"🚨 Error: {result.get('error', 'Unknown error')}")
-            sys.exit(1)
-            
+            print(f"❌ Report generation failed for {stock_symbol}")
+            if results.get("errors"):
+                print("Errors encountered:")
+                for error in results["errors"]:
+                    print(f"  - {error}")
+        
+        print("\n" + "="*60)
+        
     except KeyboardInterrupt:
-        print("\n⚠️ Report generation interrupted by user")
-        sys.exit(1)
+        print("\n\nReport generation cancelled by user.")
+        sys.exit(0)
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        print(f"\n💥 Unexpected error: {e}")
+        print(f"\nError: {e}")
+        logger.error(f"Main function error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
+    # Run the main function
     asyncio.run(main())
