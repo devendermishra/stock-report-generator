@@ -51,7 +51,7 @@ class StockReportGenerator:
     3. ReportAgent - Synthesizes all data into comprehensive reports
     """
     
-    def __init__(self, openai_api_key: Optional[str] = None, use_ai_research: bool = False, use_ai_analysis: bool = False):
+    def __init__(self, openai_api_key: Optional[str] = None, use_ai_research: bool = True, use_ai_analysis: bool = True):
         """
         Initialize the Stock Report Generator.
         
@@ -246,8 +246,8 @@ Examples:
   python main.py RELIANCE
   python main.py RELIANCE "Reliance Industries" "Oil & Gas"
   python main.py RELIANCE --export-graph graph.png
-  python main.py RELIANCE --use-ai
-  python main.py RELIANCE -i
+  python main.py RELIANCE --skip-ai
+  python main.py RELIANCE -s
   python main.py --export-graph-only graph.png
             """
         )
@@ -258,8 +258,8 @@ Examples:
                           help='Export the multi-agent graph diagram to the specified file path (e.g., graph.png)')
         parser.add_argument('--export-graph-only', dest='export_graph_only',
                           help='Only export the graph diagram without generating a report (specify output path)')
-        parser.add_argument('--use-ai', '-i', dest='use_ai', action='store_true',
-                          help='Use both AIResearchAgent (iterative LLM-based research) and AIAnalysisAgent (iterative LLM-based comprehensive analysis)')
+        parser.add_argument('--skip-ai', '-s', dest='skip_ai', action='store_true',
+                          help='Skip AI agents and use ResearchPlannerAgent + ResearchAgent (structured workflow) instead of AIResearchAgent and AIAnalysisAgent')
         
         args = parser.parse_args()
         
@@ -269,9 +269,9 @@ Examples:
             print("Error: OpenAI API key not found. Please set OPENAI_API_KEY environment variable.")
             sys.exit(1)
         
-        # If --use-ai is passed, enable both AI research and AI analysis
-        use_ai_research = args.use_ai
-        use_ai_analysis = args.use_ai
+        # Default to AI agents, use structured workflow only if --skip-ai is passed
+        use_ai_research = not args.skip_ai
+        use_ai_analysis = not args.skip_ai
         
         # Initialize the generator with AI flags
         generator = StockReportGenerator(
@@ -352,6 +352,10 @@ Examples:
         print(f"\nError: {e}")
         logger.error(f"Main function error: {e}")
         sys.exit(1)
+
+def cli_main():
+    """CLI entry point for pip-installed package."""
+    asyncio.run(main())
 
 if __name__ == "__main__":
     # Run the main function
