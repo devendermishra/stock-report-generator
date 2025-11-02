@@ -2,6 +2,11 @@
 
 A sophisticated multi-agent AI system that generates comprehensive equity research reports for NSE stocks using **LangGraph** orchestration with **7 specialized autonomous agents** and **15+ integrated tools** for collaborative reasoning.
 
+## Disclaimer
+This project is for only educational purpose. Do not use its output as stock recommendation.
+
+This project uses yfinance python project which is intended for personal purpose only. Hence, do not use this project in production or commercial applications.
+
 ## 🎯 Overview
 
 This system demonstrates advanced AI collaboration by using multiple specialized agents that work together to analyze stocks from different perspectives.
