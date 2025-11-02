@@ -51,22 +51,34 @@ class StockReportGenerator:
     3. ReportAgent - Synthesizes all data into comprehensive reports
     """
     
-    def __init__(self, openai_api_key: Optional[str] = None):
+    def __init__(self, openai_api_key: Optional[str] = None, use_ai_research: bool = False, use_ai_analysis: bool = False):
         """
         Initialize the Stock Report Generator.
         
         Args:
             openai_api_key: OpenAI API key (if not provided, will use config)
+            use_ai_research: If True, use AIResearchAgent (iterative LLM-based research).
+                            If False, use ResearchPlannerAgent + ResearchAgent (structured workflow).
+            use_ai_analysis: If True, use AIAnalysisAgent (iterative LLM-based comprehensive analysis).
+                           If False, use separate Financial, Management, Technical, Valuation agents.
         """
         self.openai_api_key = openai_api_key or Config.OPENAI_API_KEY
+        self.use_ai_research = use_ai_research
+        self.use_ai_analysis = use_ai_analysis
         
         if not self.openai_api_key:
             raise ValueError("OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it directly.")
         
         # Initialize the multi-agent orchestrator
-        self.orchestrator = MultiAgentOrchestrator(self.openai_api_key)
+        self.orchestrator = MultiAgentOrchestrator(
+            self.openai_api_key, 
+            use_ai_research=use_ai_research,
+            use_ai_analysis=use_ai_analysis
+        )
         
-        logger.info("Stock Report Generator initialized successfully")
+        research_mode = "AI Research Agent" if use_ai_research else "Research Planner + Research Agent"
+        analysis_mode = "AI Analysis Agent" if use_ai_analysis else "Separate Analysis Agents"
+        logger.info(f"Stock Report Generator initialized successfully (Research: {research_mode}, Analysis: {analysis_mode})")
     
     async def generate_report(
         self,
@@ -234,6 +246,8 @@ Examples:
   python main.py RELIANCE
   python main.py RELIANCE "Reliance Industries" "Oil & Gas"
   python main.py RELIANCE --export-graph graph.png
+  python main.py RELIANCE --use-ai
+  python main.py RELIANCE -i
   python main.py --export-graph-only graph.png
             """
         )
@@ -244,6 +258,8 @@ Examples:
                           help='Export the multi-agent graph diagram to the specified file path (e.g., graph.png)')
         parser.add_argument('--export-graph-only', dest='export_graph_only',
                           help='Only export the graph diagram without generating a report (specify output path)')
+        parser.add_argument('--use-ai', '-i', dest='use_ai', action='store_true',
+                          help='Use both AIResearchAgent (iterative LLM-based research) and AIAnalysisAgent (iterative LLM-based comprehensive analysis)')
         
         args = parser.parse_args()
         
@@ -253,8 +269,23 @@ Examples:
             print("Error: OpenAI API key not found. Please set OPENAI_API_KEY environment variable.")
             sys.exit(1)
         
-        # Initialize the generator
-        generator = StockReportGenerator()
+        # If --use-ai is passed, enable both AI research and AI analysis
+        use_ai_research = args.use_ai
+        use_ai_analysis = args.use_ai
+        
+        # Initialize the generator with AI flags
+        generator = StockReportGenerator(
+            use_ai_research=use_ai_research,
+            use_ai_analysis=use_ai_analysis
+        )
+        
+        # Log which mode is being used
+        if use_ai_research and use_ai_analysis:
+            logger.info("Using AI Research Agent (iterative LLM-based research)")
+            logger.info("Using AI Analysis Agent (iterative LLM-based comprehensive analysis)")
+        else:
+            logger.info("Using Research Planner + Research Agent (structured workflow)")
+            logger.info("Using separate Financial, Management, Technical, Valuation Analysis Agents")
         
         # Handle graph export only mode
         if args.export_graph_only:

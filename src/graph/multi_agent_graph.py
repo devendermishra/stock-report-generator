@@ -22,6 +22,9 @@ try:
         FinancialAnalysisAgent, ManagementAnalysisAgent,
         TechnicalAnalysisAgent, ValuationAnalysisAgent
     )
+    from ..agents.ai_research_agent import AIResearchAgent
+    from ..agents.ai_analysis_agent import AIAnalysisAgent
+    from ..agents.ai_report_agent import AIReportAgent
     from ..config import Config
 except ImportError:
     # Fall back to absolute imports (when run as script)
@@ -30,6 +33,9 @@ except ImportError:
         FinancialAnalysisAgent, ManagementAnalysisAgent,
         TechnicalAnalysisAgent, ValuationAnalysisAgent
     )
+    from agents.ai_research_agent import AIResearchAgent
+    from agents.ai_analysis_agent import AIAnalysisAgent
+    from agents.ai_report_agent import AIReportAgent
     from config import Config
 
 logger = logging.getLogger(__name__)
@@ -84,23 +90,56 @@ class MultiAgentOrchestrator:
     7. ReportAgent - Synthesizes data into comprehensive reports
     """
     
-    def __init__(self, openai_api_key: str):
+    def __init__(self, openai_api_key: str, use_ai_research: bool = False, use_ai_analysis: bool = False):
         """
         Initialize the multi-agent orchestrator.
         
         Args:
             openai_api_key: OpenAI API key for LLM calls
+            use_ai_research: If True, use AIResearchAgent (iterative LLM-based research)
+                            If False, use ResearchPlannerAgent + ResearchAgent (structured workflow)
+            use_ai_analysis: If True, use AIAnalysisAgent (iterative LLM-based analysis)
+                            If False, use separate Financial, Management, Technical, Valuation agents
         """
         self.openai_api_key = openai_api_key
+        self.use_ai_research = use_ai_research
+        self.use_ai_analysis = use_ai_analysis
         
-        # Initialize agents
-        self.research_planner_agent = ResearchPlannerAgent("research_planner_agent", openai_api_key)
-        self.research_agent = ResearchAgent("research_agent", openai_api_key)
-        self.financial_analysis_agent = FinancialAnalysisAgent("financial_analysis_agent", openai_api_key)
-        self.management_analysis_agent = ManagementAnalysisAgent("management_analysis_agent", openai_api_key)
-        self.technical_analysis_agent = TechnicalAnalysisAgent("technical_analysis_agent", openai_api_key)
-        self.valuation_analysis_agent = ValuationAnalysisAgent("valuation_analysis_agent", openai_api_key)
-        self.report_agent = ReportAgent("report_agent", openai_api_key)
+        # Initialize agents conditionally
+        if use_ai_research:
+            # AI-based iterative research agent
+            self.ai_research_agent = AIResearchAgent("ai_research_agent", openai_api_key)
+            self.research_planner_agent = None
+            self.research_agent = None
+        else:
+            # Traditional structured workflow agents
+            self.research_planner_agent = ResearchPlannerAgent("research_planner_agent", openai_api_key)
+            self.research_agent = ResearchAgent("research_agent", openai_api_key)
+            self.ai_research_agent = None
+        
+        # Initialize analysis agents conditionally
+        if use_ai_analysis:
+            # AI-based iterative analysis agent (replaces all 4 analysis agents)
+            self.ai_analysis_agent = AIAnalysisAgent("ai_analysis_agent", openai_api_key)
+            self.financial_analysis_agent = None
+            self.management_analysis_agent = None
+            self.technical_analysis_agent = None
+            self.valuation_analysis_agent = None
+        else:
+            # Traditional separate analysis agents
+            self.financial_analysis_agent = FinancialAnalysisAgent("financial_analysis_agent", openai_api_key)
+            self.management_analysis_agent = ManagementAnalysisAgent("management_analysis_agent", openai_api_key)
+            self.technical_analysis_agent = TechnicalAnalysisAgent("technical_analysis_agent", openai_api_key)
+            self.valuation_analysis_agent = ValuationAnalysisAgent("valuation_analysis_agent", openai_api_key)
+            self.ai_analysis_agent = None
+        
+        # Initialize report agent conditionally
+        if use_ai_research or use_ai_analysis:
+            # Use AI Report Agent when using AI for research or analysis
+            self.report_agent = AIReportAgent("ai_report_agent", openai_api_key)
+        else:
+            # Use traditional Report Agent for traditional workflow
+            self.report_agent = ReportAgent("report_agent", openai_api_key)
         
         # Build the graph
         self.graph = self._build_graph()
@@ -110,63 +149,113 @@ class MultiAgentOrchestrator:
         # Create the state graph
         workflow = StateGraph(MultiAgentState)
         
-        # Add agent nodes (cast for type-checker; async callables are supported at runtime)
-        planner_node = cast(Runnable[MultiAgentState, MultiAgentState],
-                             RunnableLambda(self._research_planner_agent_node))
-        research_node = cast(Runnable[MultiAgentState, MultiAgentState],
-                             RunnableLambda(self._research_agent_node))
-        financial_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
-                                      RunnableLambda(self._financial_analysis_agent_node))
-        management_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
-                                        RunnableLambda(self._management_analysis_agent_node))
-        technical_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
-                                       RunnableLambda(self._technical_analysis_agent_node))
-        valuation_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
-                                       RunnableLambda(self._valuation_analysis_agent_node))
-        report_node = cast(Runnable[MultiAgentState, MultiAgentState],
-                           RunnableLambda(self._report_agent_node))
-
-        workflow.add_node("research_planner_agent", planner_node)
-        workflow.add_node("research_agent", research_node)
-        workflow.add_node("financial_analysis_agent", financial_analysis_node)
-        workflow.add_node("management_analysis_agent", management_analysis_node)
-        workflow.add_node("technical_analysis_agent", technical_analysis_node)
-        workflow.add_node("valuation_analysis_agent", valuation_analysis_node)
-        workflow.add_node("report_agent", report_node)
+        logger.info(f"Building graph with use_ai_research={self.use_ai_research}, use_ai_analysis={self.use_ai_analysis}")
         
-        # Add conditional edges for ResearchPlanner -> ResearchAgent flow
-        workflow.add_conditional_edges(
-            "research_planner_agent",
-            self._should_continue_after_planning,
-            {
-                "continue": "research_agent",
-                "error": END
-            }
-        )
+        # Phase 1: Node Addition - Add all nodes based on flags
+        self._add_nodes(workflow)
         
-        # Add 4 parallel unconditional edges from research_agent to all analysis agents
-        # These will execute in parallel. Each analysis node will check for errors in state.
-        workflow.add_edge("research_agent", "financial_analysis_agent")
-        workflow.add_edge("research_agent", "management_analysis_agent")
-        workflow.add_edge("research_agent", "technical_analysis_agent")
-        workflow.add_edge("research_agent", "valuation_analysis_agent")
-        
-        # Each analysis agent node has an edge to report_agent
-        # All analysis agents route to report_agent regardless of errors
-        # This ensures report_agent waits for ALL analysis agents to complete
-        # LangGraph automatically waits for all incoming edges before executing a node
-        workflow.add_edge("financial_analysis_agent", "report_agent")
-        workflow.add_edge("management_analysis_agent", "report_agent")
-        workflow.add_edge("technical_analysis_agent", "report_agent")
-        workflow.add_edge("valuation_analysis_agent", "report_agent")
-        
-        workflow.add_edge("report_agent", END)
-        
-        # Set entry point to research planner
-        workflow.set_entry_point("research_planner_agent")
+        # Phase 2: Edge Addition - Add all edges based on flags (nodes assumed to exist)
+        self._add_edges(workflow)
         
         # Compile the graph
         return workflow.compile()
+    
+    def _add_nodes(self, workflow: StateGraph) -> None:
+        """Phase 1: Add all nodes to the graph based on flags."""
+        # Report node is always needed
+        report_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                           RunnableLambda(self._report_agent_node))
+        workflow.add_node("report_agent", report_node)
+        
+        # Add research nodes based on flag
+        if self.use_ai_research:
+            logger.info("Adding AI Research Agent node")
+            ai_research_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                                    RunnableLambda(self._ai_research_agent_node))
+            workflow.add_node("ai_research_agent", ai_research_node)
+        else:
+            logger.info("Adding Research Planner and Research Agent nodes")
+            planner_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                                RunnableLambda(self._research_planner_agent_node))
+            research_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                                RunnableLambda(self._research_agent_node))
+            workflow.add_node("research_planner_agent", planner_node)
+            workflow.add_node("research_agent", research_node)
+        
+        # Add analysis nodes based on flag
+        if self.use_ai_analysis:
+            logger.info("Adding AI Analysis Agent node")
+            ai_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                                    RunnableLambda(self._ai_analysis_agent_node))
+            workflow.add_node("ai_analysis_agent", ai_analysis_node)
+        else:
+            logger.info("Adding separate analysis agent nodes")
+            financial_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                                          RunnableLambda(self._financial_analysis_agent_node))
+            management_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                                            RunnableLambda(self._management_analysis_agent_node))
+            technical_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                                           RunnableLambda(self._technical_analysis_agent_node))
+            valuation_analysis_node = cast(Runnable[MultiAgentState, MultiAgentState],
+                                           RunnableLambda(self._valuation_analysis_agent_node))
+            workflow.add_node("financial_analysis_agent", financial_analysis_node)
+            workflow.add_node("management_analysis_agent", management_analysis_node)
+            workflow.add_node("technical_analysis_agent", technical_analysis_node)
+            workflow.add_node("valuation_analysis_agent", valuation_analysis_node)
+    
+    def _add_edges(self, workflow: StateGraph) -> None:
+        """Phase 2: Add all edges to the graph based on flags (nodes assumed to exist)."""
+        # Determine entry point and research -> analysis edges
+        if self.use_ai_research:
+            # AI Research Agent is entry point
+            workflow.set_entry_point("ai_research_agent")
+            
+            if self.use_ai_analysis:
+                # AI Research -> AI Analysis
+                workflow.add_edge("ai_research_agent", "ai_analysis_agent")
+            else:
+                # AI Research -> All Analysis Agents (parallel)
+                workflow.add_edge("ai_research_agent", "financial_analysis_agent")
+                workflow.add_edge("ai_research_agent", "management_analysis_agent")
+                workflow.add_edge("ai_research_agent", "technical_analysis_agent")
+                workflow.add_edge("ai_research_agent", "valuation_analysis_agent")
+        else:
+            # Research Planner is entry point
+            workflow.set_entry_point("research_planner_agent")
+            
+            # Research Planner -> Research Agent (conditional)
+            workflow.add_conditional_edges(
+                "research_planner_agent",
+                self._should_continue_after_planning,
+                {
+                    "continue": "research_agent",
+                    "error": END
+                }
+            )
+            
+            if self.use_ai_analysis:
+                # Research -> AI Analysis
+                workflow.add_edge("research_agent", "ai_analysis_agent")
+            else:
+                # Research -> All Analysis Agents (parallel)
+                workflow.add_edge("research_agent", "financial_analysis_agent")
+                workflow.add_edge("research_agent", "management_analysis_agent")
+                workflow.add_edge("research_agent", "technical_analysis_agent")
+                workflow.add_edge("research_agent", "valuation_analysis_agent")
+        
+        # Analysis -> Report edges
+        if self.use_ai_analysis:
+            # AI Analysis -> Report
+            workflow.add_edge("ai_analysis_agent", "report_agent")
+        else:
+            # All Analysis Agents -> Report (parallel, LangGraph waits for all)
+            workflow.add_edge("financial_analysis_agent", "report_agent")
+            workflow.add_edge("management_analysis_agent", "report_agent")
+            workflow.add_edge("technical_analysis_agent", "report_agent")
+            workflow.add_edge("valuation_analysis_agent", "report_agent")
+        
+        # Report -> END
+        workflow.add_edge("report_agent", END)
     
     async def run_workflow(
         self,
@@ -188,12 +277,13 @@ class MultiAgentOrchestrator:
         try:
             logger.info(f"Starting multi-agent workflow for {stock_symbol}")
             
-            # Create initial state
+            # Create initial state with correct entry agent
+            entry_agent = "ai_research_agent" if self.use_ai_research else "research_planner_agent"
             initial_state = MultiAgentState(
                 stock_symbol=stock_symbol,
                 company_name=company_name,
                 sector=sector,
-                current_agent="research_planner_agent",
+                current_agent=entry_agent,
                 research_plan_results=None,
                 research_results=None,
                 analysis_results=None,
@@ -296,6 +386,44 @@ class MultiAgentOrchestrator:
             logger.error(f"Research planner agent failed: {e}")
             return {
                 "errors": [f"Research planner agent failed: {str(e)}"],
+                "current_agent": "error"
+            }
+    
+    async def _ai_research_agent_node(self, state: MultiAgentState) -> dict:
+        """Execute AI research agent (iterative LLM-based research)."""
+        try:
+            logger.info(f"Executing AI research agent for {state.stock_symbol}")
+            
+            # Prepare context
+            context = {}
+            
+            # Convert state to dict for agent execution
+            state_dict = {
+                "stock_symbol": state.stock_symbol,
+                "company_name": state.company_name,
+                "sector": state.sector,
+                "context": context
+            }
+            
+            # Execute AI research agent using partial state update method
+            partial_update = await self.ai_research_agent.execute_task_partial(state_dict)
+            
+            # Extract results and update state
+            research_results = partial_update.get("results", {})
+            agent_errors = partial_update.get("errors", [])
+            
+            # Return state changes only
+            logger.info(f"AI research agent completed for {state.stock_symbol}")
+            return {
+                "research_results": research_results,
+                "current_agent": "analysis_agents",
+                "errors": agent_errors if agent_errors else []
+            }
+            
+        except Exception as e:
+            logger.error(f"AI research agent failed: {e}")
+            return {
+                "errors": [f"AI research agent failed: {str(e)}"],
                 "current_agent": "error"
             }
     
@@ -476,6 +604,66 @@ class MultiAgentOrchestrator:
             logger.error(f"Technical analysis agent failed: {e}")
             return {
                 "errors": [f"Technical analysis agent failed: {str(e)}"]
+            }
+    
+    async def _ai_analysis_agent_node(self, state: MultiAgentState) -> dict:
+        """Execute AI analysis agent (iterative LLM-based comprehensive analysis)."""
+        try:
+            logger.info(f"Executing AI analysis agent for {state.stock_symbol}")
+            
+            # Verify AI analysis agent is available
+            if not hasattr(self, 'ai_analysis_agent') or self.ai_analysis_agent is None:
+                error_msg = "AI analysis agent not initialized. Check use_ai_analysis flag."
+                logger.error(error_msg)
+                return {
+                    "errors": [error_msg],
+                    "current_agent": "error"
+                }
+            
+            # Prepare context with research results
+            context = {}
+            
+            # Include research results in context
+            # Support both traditional research agent and AI research agent results
+            if state.research_results:
+                context["research_agent_results"] = state.research_results
+                logger.info("Including research results for AI analysis agent")
+            
+            # AI research agent results are also stored in research_results, so we're covered
+            
+            # Convert state to dict for agent execution
+            state_dict = {
+                "stock_symbol": state.stock_symbol,
+                "company_name": state.company_name,
+                "sector": state.sector,
+                "context": context
+            }
+            
+            # Execute AI analysis agent using partial state update method
+            partial_update = await self.ai_analysis_agent.execute_task_partial(state_dict)
+            
+            # Extract results and update state
+            # AI analysis agent returns results structured with all analysis types
+            analysis_results = partial_update.get("results", {})
+            agent_errors = partial_update.get("errors", [])
+            
+            # Map AI analysis results to state format
+            # AI analysis agent returns: financial_analysis, management_analysis, technical_analysis, valuation_analysis
+            return {
+                "financial_analysis_results": analysis_results.get("financial_analysis", {}),
+                "management_analysis_results": analysis_results.get("management_analysis", {}),
+                "technical_analysis_results": analysis_results.get("technical_analysis", {}),
+                "valuation_analysis_results": analysis_results.get("valuation_analysis", {}),
+                "analysis_results": analysis_results,  # Keep full results for report agent
+                "current_agent": "report_agent",
+                "errors": agent_errors if agent_errors else []
+            }
+            
+        except Exception as e:
+            logger.error(f"AI analysis agent failed: {e}")
+            return {
+                "errors": [f"AI analysis agent failed: {str(e)}"],
+                "current_agent": "error"
             }
     
     async def _valuation_analysis_agent_node(self, state: MultiAgentState) -> dict:
