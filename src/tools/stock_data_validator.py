@@ -78,28 +78,7 @@ class StockDataValidator:
         except Exception as e:
             logger.error(f"Symbol validation failed for {clean_symbol}: {e}")
             return False
-    
-    def validate_symbol_with_yahoo(self, symbol: str) -> bool:
-        """
-        Validate symbol using Yahoo Finance API.
-        
-        Args:
-            symbol: Stock symbol to validate
-            
-        Returns:
-            True if symbol is valid, False otherwise
-        """
-        try:
-            clean_symbol = symbol.upper().strip()
-            logger.info(f"Validating {clean_symbol} with Yahoo Finance API")
-            
-            # Use Yahoo Finance validation
-            return self.validate_symbol(clean_symbol)
-                
-        except Exception as e:
-            logger.error(f"Yahoo Finance validation failed for {clean_symbol}: {e}")
-            return False
-    
+
     def get_company_name_and_sector(self, symbol: str) -> CompanyInfo:
         """
         Get company name and sector for a given symbol.

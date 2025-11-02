@@ -133,51 +133,7 @@ class BaseAgent(ABC):
                 "errors": [f"{self.agent_id} execution failed: {str(e)}"],
                 "confidence_score": 0.0
             }
-    
-    def select_tools(
-        self,
-        task_description: str,
-        available_tools: List[Any],
-        context: Dict[str, Any]
-    ) -> List[Any]:
-        """
-        Select appropriate tools based on task requirements and context.
-        
-        Args:
-            task_description: Description of the current task
-            available_tools: List of available tools
-            context: Current context
-            
-        Returns:
-            List of selected tools
-        """
-        # Simple tool selection logic - can be enhanced with LLM-based selection
-        selected_tools = []
-        
-        # Always include stock data tools for financial data
-        if any("stock_data" in str(type(tool)) for tool in available_tools):
-            selected_tools.extend([
-                tool for tool in available_tools 
-                if "stock_data" in str(type(tool))
-            ])
-        
-        # Include web search for research tasks
-        if "research" in task_description.lower() or "news" in task_description.lower():
-            selected_tools.extend([
-                tool for tool in available_tools 
-                if "web_search" in str(type(tool))
-            ])
-        
-        # Include PDF tools for report generation
-        if "report" in task_description.lower() or "generate" in task_description.lower():
-            selected_tools.extend([
-                tool for tool in available_tools 
-                if "pdf" in str(type(tool)) or "report" in str(type(tool))
-            ])
-        
-        self.logger.info(f"Selected {len(selected_tools)} tools for task: {task_description}")
-        return selected_tools
-    
+
     def update_context(
         self,
         current_context: Dict[str, Any],

@@ -5,18 +5,8 @@ Contains specialized helper classes for different aspects of report formatting.
 
 import logging
 from typing import Dict, Any, List
-from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
-
-@dataclass
-class ReportSection:
-    """Represents a section of a formatted report."""
-    title: str
-    content: str
-    level: int
-    order: int
-    metadata: Dict[str, Any]
 
 class FinancialFormatter:
     """Handles financial data formatting."""

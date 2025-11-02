@@ -558,16 +558,3 @@ class StockDataTool:
             True if symbol is valid, False otherwise
         """
         return self.validator.validate_symbol(symbol)
-            
-    def validate_symbol_with_yahoo(self, symbol: str) -> bool:
-        """
-        Validate symbol using Yahoo Finance API.
-        
-        Args:
-            symbol: Stock symbol to validate
-            
-        Returns:
-            True if symbol is valid, False otherwise
-        """
-        return self.validator.validate_symbol_with_yahoo(symbol)
-    
