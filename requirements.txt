@@ -1,78 +1,34 @@
 # Core dependencies
-python-dotenv==1.0.0
-requests==2.31.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# Data processing
 pandas>=2.2.0
 numpy>=1.26.0
 
-# LangGraph and orchestration
+# LangGraph and LangChain orchestration
 langgraph>=0.0.62
 langchain>=0.1.0
 langchain-openai>=0.0.5
 
-# OpenAI and AI
+# OpenAI API
 openai>=1.12.0
-anthropic>=0.8.1
 
 # Financial data
 yfinance>=0.2.28
-pandas-datareader>=0.10.0
 
-# PDF processing
+# PDF processing and generation
 PyPDF2>=3.0.1
 PyMuPDF>=1.23.8
-
-# PDF generation
 reportlab>=4.0.0
 markdown>=3.5.0
-weasyprint>=60.0
 
 # Web search
 ddgs>=8.0.0
 
-# Data processing
-beautifulsoup4==4.12.2
-lxml==5.2.1
+# HTML/XML parsing (used by web search and PDF tools)
+beautifulsoup4>=4.12.2
+lxml>=5.2.1
 
-# Async support
-aiohttp==3.9.1
-asyncio==3.4.3
-
-# Logging and monitoring
-structlog==23.2.0
-
-# Development and testing
-pytest==7.4.3
-pytest-asyncio==0.21.1
-black==23.11.0
-flake8==6.1.0
-mypy==1.7.1
-
-# Optional: Jupyter for analysis
-jupyter==1.0.0
-matplotlib>=3.9.2
-seaborn==0.13.0
-
-# GPU Support (Optional)
-# Uncomment the following lines if you want GPU acceleration for AI models
-# Note: GPU support requires CUDA-compatible hardware and drivers
-# 
-# TensorFlow GPU Support
-# tensorflow-gpu>=2.13.0  # For TensorFlow GPU support (requires CUDA 11.8+)
-# 
-# PyTorch GPU Support  
-# torch>=2.0.0  # For PyTorch GPU support (requires CUDA 11.8+)
-# torchvision>=0.15.0  # For computer vision with GPU
-# torchaudio>=2.0.0  # For audio processing with GPU
-#
-# CUDA Array Operations
-# cupy>=12.0.0  # For CUDA array operations (requires CUDA 11.2+)
-#
-# Additional GPU Libraries
-# nvidia-ml-py>=11.0.0  # For GPU monitoring and management
-# accelerate>=0.20.0  # For distributed training and inference
-#
-# System Requirements:
-# - NVIDIA GPU with CUDA Compute Capability 6.0 or higher
-# - CUDA Toolkit 11.8 or 12.0
-# - cuDNN 8.6 or higher
-# - NVIDIA drivers 520.61.05 or higher
+# Async HTTP support
+aiohttp>=3.9.1

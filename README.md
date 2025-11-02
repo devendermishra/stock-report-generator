@@ -4,7 +4,15 @@ A sophisticated multi-agent AI system that generates comprehensive equity resear
 
 ## 🎯 Overview
 
-This system demonstrates advanced AI collaboration by using multiple specialized agents that work together to analyze stocks from different perspectives:
+This system demonstrates advanced AI collaboration by using multiple specialized agents that work together to analyze stocks from different perspectives.
+
+**By default, the system uses AI-powered iterative agents** that dynamically decide which tools to call and adapt their strategy based on findings:
+
+- **AI Research** - Iterative LLM-based research that dynamically selects and executes tools
+- **AI Analysis** - Comprehensive analysis agent performing all analysis types with iterative decision-making
+- **AI Report Generation** - AI-driven report creation with professional formatting
+
+**Alternatively, you can use the structured workflow** (with `--skip-ai` flag) which follows a more traditional pipeline:
 
 - **Research Planning** - Creates structured research plans with ordered tool calls
 - **Data Gathering** - Company information, sector analysis, peer comparison
@@ -16,7 +24,35 @@ This system demonstrates advanced AI collaboration by using multiple specialized
 
 ## 🏗️ Architecture
 
-### Multi-Agent System (7 Agents)
+### Multi-Agent System
+
+**Default Mode (AI Agents - Enabled by Default):**
+```
+User Input (Stock Symbol)
+     │
+     ▼
+┌─────────────────────┐
+│  AIResearchAgent     │ Iterative LLM-based research
+│  (Default)           │ Dynamically selects & executes tools
+└──────────┬───────────┘
+           │
+     ┌─────▼──────────────┐
+     │  AIAnalysisAgent   │ Comprehensive analysis (all types)
+     │  (Default)          │ Iterative decision-making
+     └─────┬──────────────┘
+           │
+     ┌─────▼──────────────┐
+     │  AIReportAgent     │ AI-driven report generation
+     │  (Default)          │ LLM creates content, tools generate PDF
+     └─────┬──────────────┘
+           │
+     ┌─────▼─────┐
+     │ Final     │ Markdown + PDF
+     │ Report    │
+     └───────────┘
+```
+
+**Structured Mode (Use `--skip-ai` flag):**
 ```
 User Input (Stock Symbol)
      │
@@ -52,7 +88,9 @@ User Input (Stock Symbol)
 
 ### Key Components
 
-#### 🤖 Agents (7 Total)
+#### 🤖 Agents (7 Total + 3 AI Agents)
+
+**Traditional Structured Agents:**
 1. **ResearchPlannerAgent** - Creates structured research plans with ordered tool call sequences
 2. **ResearchAgent** - Gathers company information, sector overview, and peer data
 3. **FinancialAnalysisAgent** - Performs comprehensive financial statement analysis
@@ -60,6 +98,15 @@ User Input (Stock Symbol)
 5. **TechnicalAnalysisAgent** - Performs technical analysis with indicators
 6. **ValuationAnalysisAgent** - Performs valuation analysis and target price calculation
 7. **ReportAgent** - Synthesizes all data into comprehensive reports
+
+**AI-Powered Iterative Agents** (Default mode):
+- **AIResearchAgent** - Iterative LLM-based research that dynamically selects and executes tools
+- **AIAnalysisAgent** - Comprehensive analysis agent that performs all analysis types (financial, management, technical, valuation) using iterative decision-making
+- **AIReportAgent** - AI-driven report generation where content is created by LLM and PDF generation is handled by tools
+
+**Agent Selection:**
+- **Default Mode** (AI Mode): Uses AIResearchAgent + AIAnalysisAgent + AIReportAgent for fully iterative LLM-driven workflow
+- **Structured Mode** (`--skip-ai` or `-s`): Uses ResearchPlannerAgent + ResearchAgent + 4 separate Analysis Agents + ReportAgent
 
 #### 🛠️ Tools (15+ Total)
 
@@ -103,11 +150,67 @@ User Input (Stock Symbol)
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.10+
-- OpenAI API key
+- **Python 3.10 or higher** (Python 3.11+ recommended)
+- **OpenAI API key** ([Get one here](https://platform.openai.com/api-keys))
+- **pip** package manager (usually comes with Python)
 - **Optional**: NVIDIA GPU with CUDA support for accelerated AI processing
 
 ### Installation
+
+#### Method 1: Pip Install (Recommended for Development)
+
+**Install the package in editable mode** (allows you to edit code and have changes reflected immediately):
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd stock-report-generator
+
+# Create and activate virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On macOS/Linux
+# venv\Scripts\activate  # On Windows
+
+# Install in editable mode
+pip install -e .
+```
+
+**Install with GPU support:**
+```bash
+pip install -e ".[gpu]"
+```
+
+**Install minimal dependencies:**
+```bash
+pip install -e ".[minimal]"
+```
+
+**Set up environment variables:**
+```bash
+# Copy the example environment file
+cp env.example .env
+
+# Edit .env with your API keys
+nano .env  # or vim .env on macOS/Linux, notepad .env on Windows
+```
+
+Add your OpenAI API key to `.env`:
+```bash
+OPENAI_API_KEY=sk-your-actual-api-key-here
+```
+
+**After installation, you can use the CLI command:**
+```bash
+stock-report RELIANCE 
+```
+
+Or use Python directly:
+```bash
+cd src
+python main.py RELIANCE
+```
+
+#### Method 2: Standard Installation (Manual)
 
 1. **Clone the repository**
 ```bash
@@ -115,40 +218,209 @@ git clone <repository-url>
 cd stock-report-generator
 ```
 
-2. **Install dependencies**
+2. **Create a virtual environment** (Recommended)
 ```bash
+# Using venv (built-in with Python 3.10+)
+python3 -m venv venv
+
+# Activate virtual environment
+# On macOS/Linux:
+source venv/bin/activate
+
+# On Windows:
+venv\Scripts\activate
+```
+
+3. **Install dependencies**
+```bash
+# Upgrade pip first
+pip install --upgrade pip
+
+# Install all required packages
 pip install -r requirements.txt
 ```
 
-3. **Set up environment variables**
+4. **Set up environment variables**
 ```bash
+# Copy the example environment file
 cp env.example .env
+
 # Edit .env with your API keys
+# On macOS/Linux:
+nano .env
+# or
+vim .env
+
+# On Windows:
+notepad .env
 ```
 
-4. **Run the system**
+Edit the `.env` file and set your OpenAI API key:
+```bash
+OPENAI_API_KEY=sk-your-actual-api-key-here
+```
+
+5. **Verify installation**
+```bash
+# Test that Python can import the required modules
+python3 -c "import langchain, langgraph, openai; print('Installation successful!')"
+```
+
+#### Method 3: Minimal Installation
+
+For a lighter installation with only essential dependencies:
+
+```bash
+pip install -r requirements-minimal.txt
+```
+
+#### Method 4: GPU-Accelerated Installation
+
+For GPU support (optional, requires NVIDIA GPU):
+
+```bash
+# Install base requirements first
+pip install -r requirements.txt
+
+# Install GPU-specific packages
+pip install -r requirements-gpu.txt
+
+# Verify GPU support
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+```
+
+#### Method 5: Docker Installation
+
+```bash
+# Build the Docker image
+docker build -t stock-report-generator .
+
+# Run with environment variables
+docker run -e OPENAI_API_KEY=your_key_here stock-report-generator RELIANCE
+```
+
+### Post-Installation Setup
+
+1. **Create necessary directories**
+```bash
+mkdir -p reports temp data/inputs data/outputs
+```
+
+2. **Verify configuration**
+```bash
+python3 src/main.py --help
+```
+
+3. **Run a test report**
 ```bash
 cd src
-python main.py RELIANCE "Reliance Industries Limited" "Oil & Gas"
+python3 main.py RELIANCE "Reliance Industries Limited" "Oil & Gas"
+```
+
+### Troubleshooting Installation
+
+#### Common Issues
+
+**Issue: `ModuleNotFoundError: No module named 'langchain'`**
+```bash
+# Solution: Install dependencies
+pip install -r requirements.txt
+```
+
+**Issue: `pip: command not found`**
+```bash
+# Solution: Install pip or use python3 -m pip
+python3 -m pip install -r requirements.txt
+```
+
+**Issue: Permission denied errors on macOS/Linux**
+```bash
+# Solution: Use --user flag or activate virtual environment
+pip install --user -r requirements.txt
+# OR
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Issue: SSL/Certificate errors**
+```bash
+# Solution: Update certificates or use trusted hosts
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
+```
+
+**Issue: Conflicting package versions**
+```bash
+# Solution: Use a fresh virtual environment
+python3 -m venv venv_fresh
+source venv_fresh/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+**Issue: `OPENAI_API_KEY not found`**
+```bash
+# Solution: Set environment variable
+export OPENAI_API_KEY=your_key_here
+# OR add to .env file (see step 4 above)
 ```
 
 ### Example Usage
 
+#### Basic Usage
+
 ```bash
 # Generate report for Reliance Industries
-python src/main.py RELIANCE "Reliance Industries Limited" "Oil & Gas"
+cd src
+python main.py RELIANCE "Reliance Industries Limited" "Oil & Gas"
 
 # Generate report for TCS (company name and sector auto-detected if not provided)
-python src/main.py TCS
+python main.py TCS
 
 # Generate report for HDFC Bank
-python src/main.py HDFCBANK "HDFC Bank Limited" "Banking"
+python main.py HDFCBANK "HDFC Bank Limited" "Banking"
+```
 
-# Export graph diagram
-python src/main.py RELIANCE --export-graph graph.png
+#### Using Structured Workflow (Skip AI Agents)
+
+```bash
+# Skip AI agents and use structured workflow (ResearchPlanner + ResearchAgent)
+python main.py RELIANCE --skip-ai
+
+# Short form
+python main.py RELIANCE -s
+```
+
+#### Export Options
+
+```bash
+# Export graph diagram along with report
+python main.py RELIANCE --export-graph graph.png
 
 # Export graph only (without generating report)
-python src/main.py --export-graph-only graph.png
+python main.py --export-graph-only graph.png
+```
+
+#### Command-Line Options
+
+```bash
+python main.py --help  # Show all available options
+```
+
+**Available Flags:**
+- `--skip-ai` or `-s`: Skip AI agents and use ResearchPlannerAgent + ResearchAgent (structured workflow) instead of AIResearchAgent and AIAnalysisAgent (AI agents are enabled by default)
+- `--export-graph`: Export the multi-agent workflow graph diagram
+- `--export-graph-only`: Only export graph without generating report
+
+#### From Project Root
+
+If running from the project root directory:
+
+```bash
+# Method 1: Using module syntax
+python -m src.main RELIANCE
+
+# Method 2: Direct path
+python src/main.py RELIANCE
 ```
 
 ## 🚀 GPU Acceleration (Optional)
@@ -247,20 +519,6 @@ The system automatically generates professional PDF reports alongside markdown f
 - **PDFGeneratorTool**: Core PDF generation functionality
 - **Batch Conversion**: Convert multiple markdown files to PDF
 - **Custom Styling**: Professional financial report styling
-- **Utility Script**: Standalone PDF conversion tool
-
-### 📝 Usage Examples
-
-```bash
-# Generate PDF from existing markdown report
-python generate_pdf_from_markdown.py reports/stock_report_ICICIBANK_20251021_200913.md
-
-# Batch convert all markdown files to PDF
-python generate_pdf_from_markdown.py --batch reports/
-
-# Convert with custom output directory
-python generate_pdf_from_markdown.py --output-dir my_pdfs reports/stock_report_ICICIBANK_20251021_200913.md
-```
 
 ## 🔧 Configuration
 
@@ -268,7 +526,6 @@ python generate_pdf_from_markdown.py --output-dir my_pdfs reports/stock_report_I
 ```bash
 # Required
 OPENAI_API_KEY=your_openai_api_key
-# Note: TAVILY_API_KEY removed - now using free DuckDuckGo search
 
 # Optional
 DEFAULT_MODEL=gpt-4o-mini
@@ -311,34 +568,56 @@ src/
 │   └── multi_agent_graph.py          # MultiAgentOrchestrator
 ├── main.py                            # Entry point
 └── config.py                          # Configuration
-
-REQUIREMENTS_CHECKLIST.md              # Requirements verification
-IMPLEMENTATION_SUMMARY.md               # Implementation details
-MULTI_AGENT_README.md                  # Comprehensive documentation
 ```
 
 ## 🔍 How It Works
 
-### 1. **Research Planning Phase** (ResearchPlannerAgent)
+### Default Mode: AI-Powered Workflow
+
+**1. AI Research Phase** (AIResearchAgent - Default)
+- Iterative LLM-based research that dynamically selects and executes tools
+- Analyzes stock symbol, company, and sector context
+- Autonomously decides which tools to call based on current information
+- Retrieves real-time stock data (yfinance, NSE)
+- Searches for company and sector news
+- Gathers peer comparison data
+- Adapts research strategy based on findings
+
+**2. AI Analysis Phase** (AIAnalysisAgent - Default)
+- Comprehensive analysis agent that performs all analysis types
+- Iterative decision-making process
+- Performs financial, management, technical, and valuation analysis
+- Dynamically adjusts analysis depth based on available data
+- Synthesizes insights across all analysis dimensions
+
+**3. AI Report Generation** (AIReportAgent - Default)
+- AI-driven report generation where content is created by LLM
+- PDF generation is handled by tools
+- Professional markdown and PDF formatting
+- Ensures all required sections are included
+
+### Structured Mode: Traditional Workflow (Use `--skip-ai` flag)
+
+**1. Research Planning Phase** (ResearchPlannerAgent)
 - Analyzes stock symbol, company, and sector context
 - Reviews available tools
 - Creates structured research plan with ordered tool calls
 - Outputs executable plan for data gathering
 
-### 2. **Data Gathering Phase** (ResearchAgent)
+**2. Data Gathering Phase** (ResearchAgent)
 - Executes research plan from planner
 - Retrieves real-time stock data (yfinance, NSE)
 - Searches for company and sector news
 - Gathers peer comparison data
 - Collects comprehensive research data
 
-### 3. **Parallel Analysis Phase** (4 Agents run concurrently)
+**3. Parallel Analysis Phase** (4 Agents run concurrently)
 - **FinancialAnalysisAgent**: Financial statement analysis, ratios, health assessment
 - **ManagementAnalysisAgent**: Management effectiveness, governance analysis
 - **TechnicalAnalysisAgent**: Technical indicators, trends, support/resistance
 - **ValuationAnalysisAgent**: Valuation metrics, target price calculation
 
-### 4. **Report Synthesis Phase** (ReportAgent)
+**4. Report Synthesis Phase** (ReportAgent)
 - Receives all analysis results from 4 analysis agents
 - Synthesizes comprehensive report
 - Formats professional markdown document
@@ -376,11 +655,13 @@ MULTI_AGENT_README.md                  # Comprehensive documentation
 ## 🔧 Advanced Usage
 
 ### Programmatic Usage
+
+**Default: AI Agents Enabled**
 ```python
 import asyncio
 from src.main import StockReportGenerator
 
-# Initialize generator
+# Initialize generator (AI agents enabled by default)
 generator = StockReportGenerator()
 
 # Generate report programmatically
@@ -399,11 +680,15 @@ async def main():
 asyncio.run(main())
 ```
 
-### Synchronous Usage
+**Use Structured Workflow (Skip AI Agents)**
 ```python
 from src.main import StockReportGenerator
 
-generator = StockReportGenerator()
+# Initialize with structured workflow (skip AI agents)
+generator = StockReportGenerator(
+    use_ai_research=False,  # Use ResearchPlanner + ResearchAgent
+    use_ai_analysis=False   # Use separate analysis agents
+)
 
 # Synchronous wrapper
 result = generator.generate_report_sync("RELIANCE")

@@ -90,7 +90,7 @@ class MultiAgentOrchestrator:
     7. ReportAgent - Synthesizes data into comprehensive reports
     """
     
-    def __init__(self, openai_api_key: str, use_ai_research: bool = False, use_ai_analysis: bool = False):
+    def __init__(self, openai_api_key: str, use_ai_research: bool = True, use_ai_analysis: bool = True):
         """
         Initialize the multi-agent orchestrator.
         
