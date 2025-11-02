@@ -13,10 +13,30 @@ from langchain_core.tools import tool
 try:
     # Try relative imports first (when run as module)
     from ..tools.openai_logger import openai_logger
+    from ..tools.summarizer_prompts import (
+        create_summarization_prompt,
+        create_insight_extraction_prompt,
+        create_document_chunks_prompt,
+        create_insight_categorization_prompt
+    )
+    from ..tools.summarizer_parsers import (
+        parse_summary_response,
+        parse_insight_response
+    )
     from ..config import Config
 except ImportError:
     # Fall back to absolute imports (when run as script)
     from tools.openai_logger import openai_logger
+    from tools.summarizer_prompts import (
+        create_summarization_prompt,
+        create_insight_extraction_prompt,
+        create_document_chunks_prompt,
+        create_insight_categorization_prompt
+    )
+    from tools.summarizer_parsers import (
+        parse_summary_response,
+        parse_insight_response
+    )
     from config import Config
 
 logger = logging.getLogger(__name__)
@@ -90,7 +110,7 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
             }
         
         # Prepare the prompt
-        prompt = _create_summarization_prompt(text, max_length, focus_areas)
+        prompt = create_summarization_prompt(text, max_length, focus_areas)
         
         # Call OpenAI API with logging
         import time
@@ -211,7 +231,7 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
             }
         
         # Prepare the prompt
-        prompt = _create_insight_extraction_prompt(text, categories)
+        prompt = create_insight_extraction_prompt(text, categories)
         
         # Call OpenAI API
         try:
@@ -266,55 +286,6 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
             "error": f"Insight extraction failed: {str(e)}"
         }
 
-def _create_summarization_prompt(text: str, max_length: int, focus_areas: Optional[List[str]] = None) -> str:
-    """Create a prompt for text summarization."""
-    focus_instruction = ""
-    if focus_areas:
-        focus_instruction = f" Focus on these areas: {', '.join(focus_areas)}."
-    
-    return f"""
-Please summarize the following text in approximately {max_length} words.{focus_instruction}
-
-Text to summarize:
-{text}
-
-Please provide your response in the following JSON format:
-{{
-    "summary": "Your summary here",
-    "key_points": ["point1", "point2", "point3"],
-    "sentiment": "positive/negative/neutral",
-    "confidence": 0.8
-}}
-"""
-
-def _create_insight_extraction_prompt(text: str, categories: Optional[List[str]] = None) -> str:
-    """Create a prompt for insight extraction."""
-    category_instruction = ""
-    if categories:
-        category_instruction = f" Focus on these categories: {', '.join(categories)}."
-    
-    return f"""
-Please extract insights and key information from the following text.{category_instruction}
-
-Text to analyze:
-{text}
-
-Please provide your response in the following JSON format:
-{{
-    "insights": ["insight1", "insight2", "insight3"],
-    "categories": {{
-        "financial": ["metric1", "metric2"],
-        "strategic": ["strategy1", "strategy2"]
-    }},
-    "sentiment_analysis": {{
-        "sentiment": "positive/negative/neutral",
-        "confidence": 0.8
-    }},
-    "key_metrics": {{
-        "metric_name": "value"
-    }}
-}}
-"""
 
 class SummarizerTool:
     """
@@ -366,7 +337,7 @@ class SummarizerTool:
                 )
                 
             # Prepare the prompt
-            prompt = self._create_summarization_prompt(text, max_length, focus_areas)
+            prompt = create_summarization_prompt(text, max_length, focus_areas)
             
             # Call OpenAI API with logging
             import time
@@ -404,7 +375,7 @@ class SummarizerTool:
                 raise api_error
             
             # Parse the structured response
-            summary_data = self._parse_summary_response(result_text)
+            summary_data = parse_summary_response(result_text)
             
             # Calculate metrics
             word_count = len(text.split())
@@ -464,23 +435,7 @@ class SummarizerTool:
             combined_text = "\n\n---\n\n".join(chunks)
             
             # Create prompt for multi-chunk summarization
-            prompt = f"""
-            Please analyze and summarize the following financial document chunks. 
-            Focus on key financial metrics, strategic insights, and management outlook.
-            
-            Document chunks:
-            {combined_text}
-            
-            Provide a comprehensive summary in the following JSON format:
-            {{
-                "summary": "Main summary of the document",
-                "key_points": ["Point 1", "Point 2", "Point 3"],
-                "financial_metrics": {{"revenue": "value", "profit": "value"}},
-                "strategic_insights": ["Insight 1", "Insight 2"],
-                "sentiment": "positive/negative/neutral",
-                "confidence": 0.85
-            }}
-            """
+            prompt = create_document_chunks_prompt(combined_text, max_summary_length)
             
             response = openai.chat.completions.create(
                 model=self.model,
@@ -495,7 +450,7 @@ class SummarizerTool:
             result_text = response.choices[0].message.content
             
             # Parse the structured response
-            summary_data = self._parse_summary_response(result_text)
+            summary_data = parse_summary_response(result_text)
             
             # Calculate metrics
             total_word_count = sum(len(chunk.split()) for chunk in chunks)
@@ -558,34 +513,7 @@ class SummarizerTool:
                     "growth_opportunities"
                 ]
                 
-            prompt = f"""
-            Analyze the following financial text and extract key insights. 
-            Categorize insights into the following categories: {', '.join(insight_categories)}
-            
-            Text: {text}
-            
-            Provide your analysis in the following JSON format:
-            {{
-                "insights": ["Insight 1", "Insight 2", "Insight 3"],
-                "categories": {{
-                    "financial_performance": ["Financial insight 1", "Financial insight 2"],
-                    "strategic_initiatives": ["Strategic insight 1"],
-                    "market_outlook": ["Market insight 1"],
-                    "risk_factors": ["Risk insight 1"],
-                    "growth_opportunities": ["Growth insight 1"]
-                }},
-                "sentiment_analysis": {{
-                    "overall_sentiment": "positive/negative/neutral",
-                    "confidence": 0.85,
-                    "key_sentiment_indicators": ["Indicator 1", "Indicator 2"]
-                }},
-                "key_metrics": {{
-                    "revenue_growth": "X%",
-                    "profit_margin": "Y%",
-                    "market_share": "Z%"
-                }}
-            }}
-            """
+            prompt = create_insight_categorization_prompt(text, insight_categories)
             
             response = openai.chat.completions.create(
                 model=self.model,
@@ -600,7 +528,7 @@ class SummarizerTool:
             result_text = response.choices[0].message.content
             
             # Parse the structured response
-            insight_data = self._parse_insight_response(result_text)
+            insight_data = parse_insight_response(result_text)
             
             return InsightExtraction(
                 insights=insight_data.get('insights', []),
@@ -618,82 +546,6 @@ class SummarizerTool:
                 key_metrics={}
             )
             
-    def _create_summarization_prompt(
-        self,
-        text: str,
-        max_length: int,
-        focus_areas: Optional[List[str]]
-    ) -> str:
-        """Create a prompt for text summarization."""
-        focus_instruction = ""
-        if focus_areas:
-            focus_instruction = f" Focus particularly on: {', '.join(focus_areas)}."
-            
-        return f"""
-        Please summarize the following financial text in no more than {max_length} words.{focus_instruction}
-        
-        Text: {text}
-        
-        Provide your summary in the following JSON format:
-        {{
-            "summary": "Main summary of the text",
-            "key_points": ["Key point 1", "Key point 2", "Key point 3"],
-            "sentiment": "positive/negative/neutral",
-            "confidence": 0.85
-        }}
-        """
-        
-    def _parse_summary_response(self, response_text: str) -> Dict[str, Any]:
-        """Parse the structured response from the summarization API."""
-        try:
-            # Try to extract JSON from the response
-            import re
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
-                return json.loads(json_str)
-            else:
-                # Fallback: return basic structure
-                return {
-                    "summary": response_text,
-                    "key_points": [],
-                    "sentiment": "neutral",
-                    "confidence": 0.7
-                }
-        except Exception as e:
-            logger.warning(f"Could not parse structured response: {e}")
-            return {
-                "summary": response_text,
-                "key_points": [],
-                "sentiment": "neutral",
-                "confidence": 0.7
-            }
-            
-    def _parse_insight_response(self, response_text: str) -> Dict[str, Any]:
-        """Parse the structured response from the insight extraction API."""
-        try:
-            # Try to extract JSON from the response
-            import re
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
-                return json.loads(json_str)
-            else:
-                # Fallback: return basic structure
-                return {
-                    "insights": [],
-                    "categories": {},
-                    "sentiment_analysis": {"overall_sentiment": "neutral"},
-                    "key_metrics": {}
-                }
-        except Exception as e:
-            logger.warning(f"Could not parse structured insight response: {e}")
-            return {
-                "insights": [],
-                "categories": {},
-                "sentiment_analysis": {"overall_sentiment": "neutral"},
-                "key_metrics": {}
-            }
             
     def validate_api_key(self) -> bool:
         """
