@@ -22,7 +22,7 @@ from tools.summarizer_prompts import (
 class TestCreateSummarizationPrompt:
     """Test cases for create_summarization_prompt function."""
     
-    def test_basic_prompt(self):
+    def test_basic_prompt(self) -> None:
         """Test creating a basic summarization prompt."""
         text = "Sample financial text to summarize"
         max_length = 500
@@ -34,7 +34,7 @@ class TestCreateSummarizationPrompt:
         assert "key_points" in prompt.lower()
         assert "sentiment" in prompt.lower()
     
-    def test_prompt_with_focus_areas(self):
+    def test_prompt_with_focus_areas(self) -> None:
         """Test prompt creation with focus areas."""
         text = "Test text"
         max_length = 300
@@ -45,7 +45,7 @@ class TestCreateSummarizationPrompt:
         assert "strategic" in prompt
         assert "Focus on these areas" in prompt
     
-    def test_prompt_without_focus_areas(self):
+    def test_prompt_without_focus_areas(self) -> None:
         """Test prompt creation without focus areas."""
         text = "Test text"
         max_length = 200
@@ -54,7 +54,7 @@ class TestCreateSummarizationPrompt:
         assert text in prompt
         assert "Focus on these areas" not in prompt
     
-    def test_prompt_includes_json_format(self):
+    def test_prompt_includes_json_format(self) -> None:
         """Test that prompt includes JSON format specification."""
         prompt = create_summarization_prompt("test", 100)
         
@@ -66,7 +66,7 @@ class TestCreateSummarizationPrompt:
 class TestCreateInsightExtractionPrompt:
     """Test cases for create_insight_extraction_prompt function."""
     
-    def test_basic_insight_prompt(self):
+    def test_basic_insight_prompt(self) -> None:
         """Test creating a basic insight extraction prompt."""
         text = "Financial analysis text"
         prompt = create_insight_extraction_prompt(text)
@@ -77,7 +77,7 @@ class TestCreateInsightExtractionPrompt:
         assert "sentiment_analysis" in prompt.lower()
         assert "key_metrics" in prompt.lower()
     
-    def test_insight_prompt_with_categories(self):
+    def test_insight_prompt_with_categories(self) -> None:
         """Test prompt with specific categories."""
         text = "Test text"
         categories = ["financial", "strategic", "operational"]
@@ -88,7 +88,7 @@ class TestCreateInsightExtractionPrompt:
         assert "operational" in prompt
         assert "Focus on these categories" in prompt
     
-    def test_insight_prompt_json_structure(self):
+    def test_insight_prompt_json_structure(self) -> None:
         """Test that insight prompt includes correct JSON structure."""
         prompt = create_insight_extraction_prompt("test")
         
@@ -101,7 +101,7 @@ class TestCreateInsightExtractionPrompt:
 class TestCreateDocumentChunksPrompt:
     """Test cases for create_document_chunks_prompt function."""
     
-    def test_document_chunks_prompt(self):
+    def test_document_chunks_prompt(self) -> None:
         """Test creating prompt for document chunks."""
         combined_text = "Chunk 1\n\n---\n\nChunk 2"
         max_length = 1000
@@ -112,7 +112,7 @@ class TestCreateDocumentChunksPrompt:
         assert "financial_metrics" in prompt.lower()
         assert "strategic_insights" in prompt.lower()
     
-    def test_prompt_includes_required_fields(self):
+    def test_prompt_includes_required_fields(self) -> None:
         """Test that prompt includes all required JSON fields."""
         prompt = create_document_chunks_prompt("test chunks", 500)
         
@@ -126,7 +126,7 @@ class TestCreateDocumentChunksPrompt:
 class TestCreateInsightCategorizationPrompt:
     """Test cases for create_insight_categorization_prompt function."""
     
-    def test_categorization_prompt(self):
+    def test_categorization_prompt(self) -> None:
         """Test creating insight categorization prompt."""
         text = "Analysis text"
         categories = ["financial_performance", "strategic_initiatives", "market_outlook"]
@@ -137,7 +137,7 @@ class TestCreateInsightCategorizationPrompt:
         assert "strategic_initiatives" in prompt
         assert "market_outlook" in prompt
     
-    def test_prompt_includes_category_structure(self):
+    def test_prompt_includes_category_structure(self) -> None:
         """Test that prompt includes category structure in JSON format."""
         prompt = create_insight_categorization_prompt(
             "test",
@@ -151,7 +151,7 @@ class TestCreateInsightCategorizationPrompt:
         assert "sentiment_analysis" in prompt
         assert "key_metrics" in prompt
     
-    def test_multiple_categories(self):
+    def test_multiple_categories(self) -> None:
         """Test prompt with multiple categories."""
         categories = [
             "financial_performance",

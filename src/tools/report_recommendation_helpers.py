@@ -14,7 +14,18 @@ def create_investment_recommendation_section(
     management_summary: Dict[str, Any],
     determine_recommendation
 ) -> ReportSection:
-    """Create investment recommendation section."""
+    """Create investment recommendation section.
+    
+    Args:
+        stock_symbol: NSE stock symbol.
+        sector_summary: Dictionary containing sector analysis data.
+        stock_summary: Dictionary containing stock analysis data.
+        management_summary: Dictionary containing management analysis data.
+        determine_recommendation: Function to determine recommendation based on summaries.
+    
+    Returns:
+        ReportSection object containing the investment recommendation section.
+    """
     # Generate recommendation based on analysis
     current_price = stock_summary.get('current_price', 0)
     pe_ratio = stock_summary.get('pe_ratio', 0)
@@ -111,7 +122,17 @@ def create_risk_factors_section(
     management_summary: Dict[str, Any],
     format_risk_list
 ) -> ReportSection:
-    """Create risk factors section."""
+    """Create risk factors section.
+    
+    Args:
+        sector_summary: Dictionary containing sector analysis data.
+        stock_summary: Dictionary containing stock analysis data.
+        management_summary: Dictionary containing management analysis data.
+        format_risk_list: Function to format risk list into readable format.
+    
+    Returns:
+        ReportSection object containing the risk factors section.
+    """
     content = f"""
 ## Risk Factors
 
@@ -145,7 +166,20 @@ def determine_recommendation(
     score_financial_performance,
     score_management_quality
 ) -> Dict[str, str]:
-    """Determine investment recommendation based on analysis."""
+    """Determine investment recommendation based on analysis.
+    
+    Args:
+        sector_summary: Dictionary containing sector analysis data.
+        stock_summary: Dictionary containing stock analysis data.
+        management_summary: Dictionary containing management analysis data.
+        score_sector_outlook: Function to score sector outlook (0-1).
+        score_financial_performance: Function to score financial performance (0-1).
+        score_management_quality: Function to score management quality (0-1).
+    
+    Returns:
+        Dictionary containing recommendation rating, rationale, valuation,
+        risk_reward, and catalysts.
+    """
     # Score different factors
     sector_score = score_sector_outlook(sector_summary)
     financial_score = score_financial_performance(stock_summary)
@@ -184,7 +218,14 @@ def determine_recommendation(
 
 
 def score_sector_outlook(sector_summary: Dict[str, Any]) -> float:
-    """Score sector outlook (0-1)."""
+    """Score sector outlook (0-1).
+    
+    Args:
+        sector_summary: Dictionary containing sector analysis data with 'outlook' key.
+    
+    Returns:
+        Float score between 0 and 1 indicating sector outlook strength.
+    """
     outlook = sector_summary.get('outlook', '').lower()
     if outlook in ['positive', 'strong', 'bullish']:
         return 0.8
@@ -197,7 +238,14 @@ def score_sector_outlook(sector_summary: Dict[str, Any]) -> float:
 
 
 def score_financial_performance(stock_summary: Dict[str, Any]) -> float:
-    """Score financial performance (0-1)."""
+    """Score financial performance (0-1).
+    
+    Args:
+        stock_summary: Dictionary containing stock analysis data with 'pe_ratio' key.
+    
+    Returns:
+        Float score between 0 and 1 indicating financial performance strength.
+    """
     pe_ratio = stock_summary.get('pe_ratio', 0)
     if pe_ratio and 10 <= pe_ratio <= 25:  # Reasonable P/E range
         return 0.7
@@ -210,7 +258,14 @@ def score_financial_performance(stock_summary: Dict[str, Any]) -> float:
 
 
 def score_management_quality(management_summary: Dict[str, Any]) -> float:
-    """Score management quality (0-1)."""
+    """Score management quality (0-1).
+    
+    Args:
+        management_summary: Dictionary containing management analysis data with 'management_rating' key.
+    
+    Returns:
+        Float score between 0 and 1 indicating management quality strength.
+    """
     management_rating = management_summary.get('management_rating', '').lower()
     if management_rating in ['excellent', 'strong', 'good']:
         return 0.8

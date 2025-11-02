@@ -46,15 +46,38 @@ class ReportFormatterTool:
     """
     
     def _format_market_cap(self, market_cap: Any) -> str:
-        """Format market cap in a readable format."""
+        """Format market cap in a readable format.
+        
+        Args:
+            market_cap: Market capitalization value to format.
+        
+        Returns:
+            Formatted market cap string.
+        """
         return self.utils.format_market_cap(market_cap)
     
     def _get_recommendation_summary(self, stock_summary: Dict[str, Any], sector_summary: Dict[str, Any], management_summary: Dict[str, Any]) -> str:
-        """Get a concise recommendation summary."""
+        """Get a concise recommendation summary.
+        
+        Args:
+            stock_summary: Dictionary containing stock analysis data.
+            sector_summary: Dictionary containing sector analysis data.
+            management_summary: Dictionary containing management analysis data.
+        
+        Returns:
+            Concise recommendation summary string.
+        """
         return self.utils.get_recommendation_summary(stock_summary, sector_summary, management_summary)
     
     def _get_management_outlook_summary(self, management_summary: Dict[str, Any]) -> str:
-        """Get a concise management outlook summary."""
+        """Get a concise management outlook summary.
+        
+        Args:
+            management_summary: Dictionary containing management analysis data.
+        
+        Returns:
+            Concise management outlook summary string.
+        """
         # Try to get management outlook
         outlook = management_summary.get('management_outlook', '')
         if outlook and outlook != 'Management discussion highlights...':
@@ -75,7 +98,14 @@ class ReportFormatterTool:
             return "Management outlook analysis is being processed. The company's strategic direction and future prospects will be detailed based on recent financial reports and management communications."
     
     def _format_trends_list(self, trends: List[str]) -> str:
-        """Format trends list into proper markdown format."""
+        """Format trends list into proper markdown format.
+        
+        Args:
+            trends: List of trend strings or a single string.
+        
+        Returns:
+            Formatted markdown string of trends.
+        """
         if not trends:
             return "Key sector trends include digital transformation, regulatory changes, and market consolidation."
         
@@ -95,7 +125,14 @@ class ReportFormatterTool:
             return "Key sector trends include digital transformation, regulatory changes, and market consolidation."
     
     def _format_peer_comparison(self, peer_data: Dict[str, Any]) -> str:
-        """Format peer comparison data into readable format."""
+        """Format peer comparison data into readable format.
+        
+        Args:
+            peer_data: Dictionary containing peer comparison data.
+        
+        Returns:
+            Formatted peer comparison string.
+        """
         if not peer_data:
             return "Peer comparison analysis is being processed. Key competitors and their performance metrics will be detailed based on sector analysis."
         
@@ -137,7 +174,14 @@ class ReportFormatterTool:
         return '\n\n'.join(comparison_text)
     
     def _format_regulatory_environment(self, regulatory_data: str) -> str:
-        """Format regulatory environment data into readable format."""
+        """Format regulatory environment data into readable format.
+        
+        Args:
+            regulatory_data: String containing regulatory environment data.
+        
+        Returns:
+            Formatted regulatory environment string.
+        """
         if not regulatory_data or regulatory_data == "Regulatory environment analysis pending":
             return "Regulatory environment analysis is being processed. Key regulatory developments, policy changes, and compliance requirements will be detailed based on recent regulatory updates and sector-specific regulations."
         
@@ -149,7 +193,14 @@ class ReportFormatterTool:
         return f"Regulatory environment analysis indicates ongoing regulatory developments affecting the sector. Key regulatory factors include policy changes, compliance requirements, and regulatory oversight that may impact sector performance and operational dynamics."
     
     def _format_technical_analysis(self, technical_data: Dict[str, Any]) -> str:
-        """Format technical analysis data into readable format."""
+        """Format technical analysis data into readable format.
+        
+        Args:
+            technical_data: Dictionary containing technical analysis data.
+        
+        Returns:
+            Formatted technical analysis string.
+        """
         if not technical_data:
             return "Technical analysis indicates neutral market sentiment with mixed signals. Key technical indicators suggest a balanced outlook for the stock."
         
@@ -448,7 +499,17 @@ class ReportFormatterTool:
         stock_summary: Dict[str, Any],
         management_summary: Dict[str, Any]
     ) -> ReportSection:
-        """Create executive summary section."""
+        """Create executive summary section.
+        
+        Args:
+            stock_symbol: NSE stock symbol.
+            sector_summary: Dictionary containing sector analysis data.
+            stock_summary: Dictionary containing stock analysis data.
+            management_summary: Dictionary containing management analysis data.
+        
+        Returns:
+            ReportSection object containing the executive summary.
+        """
         # Extract company name and sectors
         company_name = stock_summary.get('company_name', 'N/A')
         sectors = stock_summary.get('sectors', [])
@@ -512,7 +573,16 @@ class ReportFormatterTool:
         stock_summary: Dict[str, Any],
         sector_summary: Dict[str, Any] = None
     ) -> ReportSection:
-        """Create company overview section."""
+        """Create company overview section.
+        
+        Args:
+            stock_symbol: NSE stock symbol.
+            stock_summary: Dictionary containing stock analysis data.
+            sector_summary: Optional dictionary containing sector analysis data.
+        
+        Returns:
+            ReportSection object containing the company overview.
+        """
         # Extract company information
         company_name = stock_summary.get('company_name', 'N/A')
         sectors = stock_summary.get('sectors', [])
@@ -568,7 +638,14 @@ class ReportFormatterTool:
         self,
         sector_summary: Dict[str, Any]
     ) -> ReportSection:
-        """Create sector analysis section."""
+        """Create sector analysis section.
+        
+        Args:
+            sector_summary: Dictionary containing sector analysis data.
+        
+        Returns:
+            ReportSection object containing the sector analysis.
+        """
         content = f"""
 ## Sector Analysis
 
@@ -597,7 +674,14 @@ class ReportFormatterTool:
         self,
         stock_summary: Dict[str, Any]
     ) -> ReportSection:
-        """Create financial performance section."""
+        """Create financial performance section.
+        
+        Args:
+            stock_summary: Dictionary containing stock analysis data.
+        
+        Returns:
+            ReportSection object containing the financial performance.
+        """
         content = f"""
 ## Financial Performance
 
@@ -625,7 +709,14 @@ class ReportFormatterTool:
         )
         
     def _create_financial_summary(self, stock_summary: Dict[str, Any]) -> ReportSection:
-        """Create comprehensive financial summary section."""
+        """Create comprehensive financial summary section.
+        
+        Args:
+            stock_summary: Dictionary containing stock analysis data.
+        
+        Returns:
+            ReportSection object containing the financial summary.
+        """
         # Extract key financial metrics
         current_price = stock_summary.get('current_price', 0) or 0
         pe_ratio = stock_summary.get('pe_ratio', 0) or 0
@@ -681,7 +772,18 @@ class ReportFormatterTool:
         )
         
     def _get_financial_health_indicators(self, pe_ratio: float, pb_ratio: float, eps: float, dividend_yield: float, beta: float) -> str:
-        """Get financial health indicators based on key metrics."""
+        """Get financial health indicators based on key metrics.
+        
+        Args:
+            pe_ratio: Price-to-earnings ratio.
+            pb_ratio: Price-to-book ratio.
+            eps: Earnings per share.
+            dividend_yield: Dividend yield percentage.
+            beta: Beta value.
+        
+        Returns:
+            Formatted string containing financial health indicators.
+        """
         indicators = []
         
         # P/E Ratio analysis
@@ -738,7 +840,14 @@ class ReportFormatterTool:
         self,
         management_summary: Dict[str, Any]
     ) -> ReportSection:
-        """Create management discussion section."""
+        """Create management discussion section.
+        
+        Args:
+            management_summary: Dictionary containing management analysis data.
+        
+        Returns:
+            ReportSection object containing the management discussion.
+        """
         # Get management outlook with better fallback
         management_outlook = management_summary.get('management_outlook', 
                                                   management_summary.get('summary', 
@@ -799,7 +908,17 @@ class ReportFormatterTool:
         stock_summary: Dict[str, Any],
         management_summary: Dict[str, Any]
     ) -> ReportSection:
-        """Create investment recommendation section."""
+        """Create investment recommendation section.
+        
+        Args:
+            stock_symbol: NSE stock symbol.
+            sector_summary: Dictionary containing sector analysis data.
+            stock_summary: Dictionary containing stock analysis data.
+            management_summary: Dictionary containing management analysis data.
+        
+        Returns:
+            ReportSection object containing the investment recommendation.
+        """
         # Generate recommendation based on analysis
         current_price = stock_summary.get('current_price', 0)
         pe_ratio = stock_summary.get('pe_ratio', 0)
@@ -895,7 +1014,17 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
         stock_summary: Dict[str, Any],
         management_summary: Dict[str, Any]
     ) -> Dict[str, str]:
-        """Determine investment recommendation based on analysis."""
+        """Determine investment recommendation based on analysis.
+        
+        Args:
+            sector_summary: Dictionary containing sector analysis data.
+            stock_summary: Dictionary containing stock analysis data.
+            management_summary: Dictionary containing management analysis data.
+        
+        Returns:
+            Dictionary containing recommendation rating, rationale, valuation,
+            risk_reward, and catalysts.
+        """
         # Score different factors
         sector_score = self._score_sector_outlook(sector_summary)
         financial_score = self._score_financial_performance(stock_summary)
@@ -933,7 +1062,14 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
         }
     
     def _score_sector_outlook(self, sector_summary: Dict[str, Any]) -> float:
-        """Score sector outlook (0-1)."""
+        """Score sector outlook (0-1).
+        
+        Args:
+            sector_summary: Dictionary containing sector analysis data with 'outlook' key.
+        
+        Returns:
+            Float score between 0 and 1 indicating sector outlook strength.
+        """
         outlook = sector_summary.get('outlook', '').lower()
         if outlook in ['positive', 'strong', 'bullish']:
             return 0.8
@@ -945,7 +1081,14 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
             return 0.5  # Default neutral
     
     def _score_financial_performance(self, stock_summary: Dict[str, Any]) -> float:
-        """Score financial performance (0-1)."""
+        """Score financial performance (0-1).
+        
+        Args:
+            stock_summary: Dictionary containing stock analysis data with 'pe_ratio' key.
+        
+        Returns:
+            Float score between 0 and 1 indicating financial performance strength.
+        """
         pe_ratio = stock_summary.get('pe_ratio', 0)
         if pe_ratio and 10 <= pe_ratio <= 25:  # Reasonable P/E range
             return 0.7
@@ -957,7 +1100,14 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
             return 0.5  # Default neutral
     
     def _score_management_quality(self, management_summary: Dict[str, Any]) -> float:
-        """Score management quality (0-1)."""
+        """Score management quality (0-1).
+        
+        Args:
+            management_summary: Dictionary containing management analysis data with 'management_rating' key.
+        
+        Returns:
+            Float score between 0 and 1 indicating management quality strength.
+        """
         management_rating = management_summary.get('management_rating', '').lower()
         if management_rating in ['excellent', 'strong', 'good']:
             return 0.8
@@ -974,7 +1124,16 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
         stock_summary: Dict[str, Any],
         management_summary: Dict[str, Any]
     ) -> ReportSection:
-        """Create risk factors section."""
+        """Create risk factors section.
+        
+        Args:
+            sector_summary: Dictionary containing sector analysis data.
+            stock_summary: Dictionary containing stock analysis data.
+            management_summary: Dictionary containing management analysis data.
+        
+        Returns:
+            ReportSection object containing the risk factors.
+        """
         content = f"""
 ## Risk Factors
 
@@ -1000,7 +1159,14 @@ Based on comprehensive analysis of {stock_symbol}, we provide the following inve
         )
         
     def _create_swot_analysis(self, swot_summary: Dict[str, Any]) -> ReportSection:
-        """Create SWOT analysis section."""
+        """Create SWOT analysis section.
+        
+        Args:
+            swot_summary: Dictionary containing SWOT analysis data.
+        
+        Returns:
+            ReportSection object containing the SWOT analysis.
+        """
         content = f"""
 ## SWOT Analysis
 

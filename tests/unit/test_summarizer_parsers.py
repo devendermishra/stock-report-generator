@@ -22,7 +22,7 @@ from tools.summarizer_parsers import (
 class TestParseSummaryResponse:
     """Test cases for parse_summary_response function."""
     
-    def test_parse_valid_json_response(self):
+    def test_parse_valid_json_response(self) -> None:
         """Test parsing a valid JSON response."""
         response = '{"summary": "Test summary", "key_points": ["point1", "point2"], "sentiment": "positive", "confidence": 0.9}'
         result = parse_summary_response(response)
@@ -32,7 +32,7 @@ class TestParseSummaryResponse:
         assert result["sentiment"] == "positive"
         assert result["confidence"] == 0.9
     
-    def test_parse_json_with_extra_text(self):
+    def test_parse_json_with_extra_text(self) -> None:
         """Test parsing JSON that has extra text around it."""
         response = 'Here is the result: {"summary": "Extra text summary", "key_points": ["point1"], "sentiment": "neutral", "confidence": 0.8} and more text'
         result = parse_summary_response(response)
@@ -42,7 +42,7 @@ class TestParseSummaryResponse:
         assert result["sentiment"] == "neutral"
         assert result["confidence"] == 0.8
     
-    def test_parse_non_json_response(self):
+    def test_parse_non_json_response(self) -> None:
         """Test parsing a non-JSON response (fallback behavior)."""
         response = "This is just plain text without JSON"
         result = parse_summary_response(response)
@@ -52,7 +52,7 @@ class TestParseSummaryResponse:
         assert result["sentiment"] == "neutral"
         assert result["confidence"] == 0.7
     
-    def test_parse_multiline_json(self):
+    def test_parse_multiline_json(self) -> None:
         """Test parsing multiline JSON response."""
         response = """{
             "summary": "Multi-line summary",
@@ -66,7 +66,7 @@ class TestParseSummaryResponse:
         assert len(result["key_points"]) == 3
         assert result["sentiment"] == "negative"
     
-    def test_parse_invalid_json_structure(self):
+    def test_parse_invalid_json_structure(self) -> None:
         """Test parsing invalid JSON structure (fallback behavior)."""
         response = '{"invalid": json structure}'
         result = parse_summary_response(response)
@@ -79,7 +79,7 @@ class TestParseSummaryResponse:
 class TestParseInsightResponse:
     """Test cases for parse_insight_response function."""
     
-    def test_parse_valid_insight_json(self):
+    def test_parse_valid_insight_json(self) -> None:
         """Test parsing a valid insight extraction JSON."""
         response = json.dumps({
             "insights": ["Insight 1", "Insight 2"],
@@ -102,7 +102,7 @@ class TestParseInsightResponse:
         assert result["sentiment_analysis"]["sentiment"] == "positive"
         assert result["key_metrics"]["revenue"] == "100M"
     
-    def test_parse_insight_with_extra_text(self):
+    def test_parse_insight_with_extra_text(self) -> None:
         """Test parsing insight JSON with surrounding text."""
         response = 'The analysis shows: {"insights": ["Test"], "categories": {}, "sentiment_analysis": {"overall_sentiment": "neutral"}, "key_metrics": {}}'
         result = parse_insight_response(response)
@@ -110,7 +110,7 @@ class TestParseInsightResponse:
         assert result["insights"] == ["Test"]
         assert result["sentiment_analysis"]["overall_sentiment"] == "neutral"
     
-    def test_parse_non_json_insight(self):
+    def test_parse_non_json_insight(self) -> None:
         """Test parsing non-JSON insight response (fallback)."""
         response = "Just plain text insight"
         result = parse_insight_response(response)
@@ -124,7 +124,7 @@ class TestParseInsightResponse:
 class TestParseJsonResponse:
     """Test cases for parse_json_response generic function."""
     
-    def test_parse_valid_json_with_default(self):
+    def test_parse_valid_json_with_default(self) -> None:
         """Test parsing valid JSON with custom default."""
         response = '{"key": "value"}'
         default = {"default": "data"}
@@ -132,7 +132,7 @@ class TestParseJsonResponse:
         
         assert result["key"] == "value"
     
-    def test_parse_invalid_json_with_default(self):
+    def test_parse_invalid_json_with_default(self) -> None:
         """Test parsing invalid JSON falls back to default."""
         response = "not json"
         default = {"error": "parsing failed"}
@@ -140,14 +140,14 @@ class TestParseJsonResponse:
         
         assert result == default
     
-    def test_parse_json_no_default(self):
+    def test_parse_json_no_default(self) -> None:
         """Test parsing JSON without default (should return empty dict)."""
         response = "not json"
         result = parse_json_response(response)
         
         assert result == {}
     
-    def test_parse_nested_json(self):
+    def test_parse_nested_json(self) -> None:
         """Test parsing nested JSON structures."""
         response = json.dumps({
             "level1": {
