@@ -1,0 +1,50 @@
+[flake8]
+# Flake8 configuration for stock-report-generator
+
+# Maximum line length
+max-line-length = 120
+
+# Maximum complexity
+max-complexity = 10
+
+# Files and directories to exclude
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    .env,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    .mypy_cache,
+    reports,
+    data/processed,
+    data/raw,
+    data/outputs,
+    stock_report_generator.log
+
+# Ignore specific error codes
+# E501: line too long (handled by max-line-length)
+# W503: line break before binary operator (conflicts with Black)
+# E203: whitespace before ':' (conflicts with Black)
+ignore = 
+    E203,
+    E501,
+    W503,
+    E266,
+    E402
+
+# Per-file ignores
+per-file-ignores =
+    __init__.py:F401,
+    setup.py:E402,
+    tests/*:F401
+
+# Show source code for each error
+show-source = True
+
+# Count errors and warnings
+statistics = True

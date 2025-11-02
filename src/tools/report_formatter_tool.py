@@ -19,6 +19,21 @@ from .report_formatter_models import ReportSection, ConsistencyIssue, FormattedR
 from .report_formatter_utils import ReportFormatterUtils
 from .report_formatter_helpers import FinancialFormatter, TechnicalFormatter, PeerAnalysisFormatter, SWOTFormatter
 from .technical_analysis_formatter import TechnicalAnalysisFormatter
+from .report_section_generators import (
+    create_executive_summary_section,
+    create_company_overview_section,
+    create_sector_analysis_section,
+    create_financial_performance_section,
+    create_management_discussion_section
+)
+from .report_recommendation_helpers import (
+    create_investment_recommendation_section,
+    create_risk_factors_section,
+    determine_recommendation,
+    score_sector_outlook,
+    score_financial_performance,
+    score_management_quality
+)
 
 logger = logging.getLogger(__name__)
 
@@ -344,23 +359,27 @@ class ReportFormatterTool:
             sections = []
             
             # Executive Summary
-            sections.append(self._create_executive_summary(
-                stock_symbol, sector_summary, stock_summary, management_summary
+            sections.append(create_executive_summary_section(
+                stock_symbol, stock_summary, sector_summary, management_summary,
+                self._format_market_cap, self._get_recommendation_summary, self._get_management_outlook_summary
             ))
             
             # Company Overview
-            sections.append(self._create_company_overview(
-                stock_symbol, stock_summary, sector_summary
+            sections.append(create_company_overview_section(
+                stock_symbol, stock_summary, sector_summary, self._format_market_cap
             ))
             
             # Sector Analysis
-            sections.append(self._create_sector_analysis(
-                sector_summary
+            sections.append(create_sector_analysis_section(
+                sector_summary,
+                self._format_trends_list,
+                self._format_peer_comparison,
+                self._format_regulatory_environment
             ))
             
             # Financial Performance
-            sections.append(self._create_financial_performance(
-                stock_summary
+            sections.append(create_financial_performance_section(
+                stock_summary, self._format_technical_analysis
             ))
             
             # Financial Summary
@@ -369,18 +388,19 @@ class ReportFormatterTool:
             ))
             
             # Management Discussion
-            sections.append(self._create_management_discussion(
-                management_summary
-            ))
+            sections.append(create_management_discussion_section(management_summary))
             
             # Investment Recommendation
-            sections.append(self._create_investment_recommendation(
-                stock_symbol, sector_summary, stock_summary, management_summary
+            def _determine_rec(sector, stock, mgmt):
+                return determine_recommendation(sector, stock, mgmt, 
+                    score_sector_outlook, score_financial_performance, score_management_quality)
+            sections.append(create_investment_recommendation_section(
+                stock_symbol, sector_summary, stock_summary, management_summary, _determine_rec
             ))
             
             # Risk Factors
-            sections.append(self._create_risk_factors(
-                sector_summary, stock_summary, management_summary
+            sections.append(create_risk_factors_section(
+                sector_summary, stock_summary, management_summary, self._format_risk_list
             ))
             
             # SWOT Analysis
