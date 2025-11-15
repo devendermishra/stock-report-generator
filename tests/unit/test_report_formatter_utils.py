@@ -23,12 +23,12 @@ class TestFormatMarketCap:
     
     def test_format_large_cap(self) -> None:
         """Test formatting large market cap (> 1 lakh crores)."""
-        # 2 lakh crores = 2e12
+        # 20 lakh crores = 2e13 (2000000 crores)
         market_cap = 20000000000000
         result = self.utils.format_market_cap(market_cap)
         
         assert "L Cr" in result
-        assert "2.00" in result
+        assert "20.00" in result
     
     def test_format_medium_cap(self) -> None:
         """Test formatting medium market cap (1000-100000 crores)."""
