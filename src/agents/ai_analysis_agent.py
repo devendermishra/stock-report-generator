@@ -57,6 +57,16 @@ class AIAnalysisAgent(BaseAgent):
     """
     AI Analysis Agent with iterative tool selection for comprehensive analysis.
     
+    **Specialization:** Comprehensive Multi-Dimensional Analysis (AI-Powered Iterative Mode)
+    
+    **Role:** Performs all analysis types (financial, management, technical, valuation)
+    using iterative LLM-based decision-making. Replaces all 4 separate analysis agents
+    in AI-Powered Iterative Mode.
+    
+    **When Used:** Only in AI-Powered Iterative Mode (replaces Financial, Management,
+    Technical, and Valuation Analysis Agents)
+    
+    **Execution Pattern:**
     This agent uses an LLM in a loop to:
     1. Analyze what data is needed for different analysis types
     2. Decide which tools to use to gather that data
@@ -65,8 +75,21 @@ class AIAnalysisAgent(BaseAgent):
     5. Decide if more data or analysis is needed
     6. Stop when comprehensive analysis is complete
     
-    Implements the true LangGraph agent pattern as an alternative to
-    separate Financial, Management, Technical, and Valuation Analysis Agents.
+    **Key Features:**
+    - Comprehensive coverage (handles all four analysis types)
+    - Dynamic data gathering (gathers additional data if needed)
+    - Cross-dimensional synthesis (integrates insights across analysis types)
+    - Adaptive depth (adjusts analysis depth based on data availability)
+    
+    **Tools Used:**
+    - get_stock_metrics, get_company_info
+    - search_company_news, search_market_trends
+    - format_technical_analysis (via helpers)
+    
+    **Max Iterations:** 12 (configurable)
+    
+    For detailed information on agent specialization and roles,
+    see docs/AGENT_SPECIALIZATION.md
     """
     
     def __init__(self, agent_id: str, openai_api_key: str):

@@ -45,6 +45,15 @@ class AIResearchAgent(BaseAgent):
     """
     AI Research Agent with iterative tool selection using LLM decision-making.
     
+    **Specialization:** Adaptive Iterative Research (AI-Powered Iterative Mode)
+    
+    **Role:** Uses iterative LLM-based decision-making to dynamically gather research
+    data based on emerging insights. Implements the true LangGraph agent pattern
+    with autonomous tool selection.
+    
+    **When Used:** Only in AI-Powered Iterative Mode (replaces ResearchPlannerAgent + ResearchAgent)
+    
+    **Execution Pattern:**
     This agent uses an LLM in a loop to:
     1. Analyze current state and gathered information
     2. Decide which tool to use next
@@ -52,8 +61,21 @@ class AIResearchAgent(BaseAgent):
     4. Observe results
     5. Decide if goal is achieved or continue with next tool
     
-    Implements the true LangGraph agent pattern as an alternative to
-    ResearchPlannerAgent + ResearchAgent workflow.
+    **Key Features:**
+    - Dynamic tool selection based on current state
+    - Self-correcting (can gather missing data if initial results incomplete)
+    - Efficient (skips unnecessary tools if goal already achieved)
+    - Adaptive (adjusts research depth based on data availability)
+    
+    **Tools Used:**
+    - get_stock_metrics, get_company_info
+    - search_sector_news, search_company_news, search_market_trends
+    - search_web_generic
+    
+    **Max Iterations:** 5 (configurable)
+    
+    For detailed information on agent specialization and roles,
+    see docs/AGENT_SPECIALIZATION.md
     """
     
     def __init__(self, agent_id: str, openai_api_key: str):

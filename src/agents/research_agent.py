@@ -27,11 +27,28 @@ class ResearchAgent(BaseAgent):
     """
     Research Agent responsible for gathering comprehensive research data.
     
-    Tasks:
+    **Specialization:** Comprehensive Data Gathering (Structured Workflow Mode)
+    
+    **Role:** Executes the research plan created by ResearchPlannerAgent to gather
+    all necessary data for analysis. This agent follows a structured, plan-driven
+    approach rather than iterative decision-making.
+    
+    **When Used:** Only in Structured Workflow Mode (after ResearchPlannerAgent)
+    
+    **Tasks:**
+    - Executes tool calls in the order specified by research plan
     - Company information and background
     - Sector overview and trends
     - Peer analysis and comparison
     - Market news and developments
+    
+    **Tools Used:**
+    - get_stock_metrics, get_company_info, validate_symbol
+    - search_sector_news, search_company_news, search_market_trends
+    - generic_web_search, search_web_generic
+    
+    For detailed information on agent specialization and roles,
+    see docs/AGENT_SPECIALIZATION.md
     """
     
     def __init__(self, agent_id: str, openai_api_key: str):

@@ -28,9 +28,26 @@ class FinancialAnalysisAgent(BaseAgent):
     """
     Financial Analysis Agent responsible for financial statement analysis and ratio interpretation.
     
-    Tasks:
+    **Specialization:** Financial Statement Analysis and Ratio Interpretation (Structured Workflow Mode)
+    
+    **Role:** Performs comprehensive financial analysis including financial ratios,
+    health assessment, and financial metrics evaluation. Runs in parallel with other
+    analysis agents in Structured Workflow Mode.
+    
+    **When Used:** Only in Structured Workflow Mode (runs in parallel with Management,
+    Technical, and Valuation Analysis Agents)
+    
+    **Tasks:**
     - Financial statement analysis and ratio interpretation
-    - Financial health assessment
+    - Calculates additional financial ratios (P/E, P/B, Price-to-Sales)
+    - Financial health assessment using LLM analysis
+    - Market cap categorization (Large/Mid/Small Cap)
+    
+    **Tools Used:**
+    - get_stock_metrics (for financial metrics)
+    
+    For detailed information on agent specialization and roles,
+    see docs/AGENT_SPECIALIZATION.md
     """
     
     def __init__(self, agent_id: str, openai_api_key: str):

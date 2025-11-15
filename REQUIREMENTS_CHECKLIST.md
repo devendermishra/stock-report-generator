@@ -345,12 +345,9 @@ All tools extend capabilities beyond basic LLM responses:
 - `src/tools/` - All tool implementations (17+ tools)
 - `src/main.py` - Entry point with dual workflow mode selection
 - `src/config.py` - Configuration including model and LLM provider settings
-- `DOCUMENTATION.md` - Comprehensive system documentation with Results section
 
 ### Related Documentation:
-- `DOCUMENTATION.md` - Complete system documentation (Abstract, Introduction, Methodology, Installation, Fine-tuning, Results)
 - `README.md` - Quick start guide and overview
-- `MULTI_AGENT_README.md` - Agent-specific documentation
 - `IMPLEMENTATION_SUMMARY.md` - Detailed implementation summary
 
 ---

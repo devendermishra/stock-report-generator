@@ -11,13 +11,13 @@ This project uses yfinance python project which is intended for personal purpose
 
 This system demonstrates advanced AI collaboration by using multiple specialized agents that work together to analyze stocks from different perspectives.
 
-**By default, the system uses AI-powered iterative agents** that dynamically decide which tools to call and adapt their strategy based on findings:
+**By default in agentic AI mode, the system uses AI-powered iterative agents** that dynamically decide which tools to call and adapt their strategy based on findings:
 
 - **AI Research** - Iterative LLM-based research that dynamically selects and executes tools
 - **AI Analysis** - Comprehensive analysis agent performing all analysis types with iterative decision-making
 - **AI Report Generation** - AI-driven report creation with professional formatting
 
-**Alternatively, you can use the structured workflow** (with `--skip-ai` flag) which follows a more traditional pipeline:
+**Alternatively, you can use the mixed mode workflow** (with `--skip-ai` flag) which follows a more traditional pipeline:
 
 - **Research Planning** - Creates structured research plans with ordered tool calls
 - **Data Gathering** - Company information, sector analysis, peer comparison
@@ -31,24 +31,24 @@ This system demonstrates advanced AI collaboration by using multiple specialized
 
 ### Multi-Agent System
 
-**Default Mode (AI Agents - Enabled by Default):**
+** Agentic AI Mode (Default Mode):**
 ```
 User Input (Stock Symbol)
      │
      ▼
 ┌─────────────────────┐
-│  AIResearchAgent     │ Iterative LLM-based research
-│  (Default)           │ Dynamically selects & executes tools
-└──────────┬───────────┘
+│  AIResearchAgent    │ Iterative LLM-based research
+│  (Default)          │ Dynamically selects & executes tools
+└──────────┬──────────┘
            │
      ┌─────▼──────────────┐
      │  AIAnalysisAgent   │ Comprehensive analysis (all types)
-     │  (Default)          │ Iterative decision-making
+     │  (Default)         │ Iterative decision-making
      └─────┬──────────────┘
            │
      ┌─────▼──────────────┐
      │  AIReportAgent     │ AI-driven report generation
-     │  (Default)          │ LLM creates content, tools generate PDF
+     │  (Default)         │ LLM creates content, tools generate PDF
      └─────┬──────────────┘
            │
      ┌─────▼─────┐
@@ -57,7 +57,7 @@ User Input (Stock Symbol)
      └───────────┘
 ```
 
-**Structured Mode (Use `--skip-ai` flag):**
+**Mixed Mode (Use `--skip-ai` flag):**
 ```
 User Input (Stock Symbol)
      │
@@ -93,25 +93,33 @@ User Input (Stock Symbol)
 
 ### Key Components
 
-#### 🤖 Agents (7 Total + 3 AI Agents)
+#### 🤖 Agents (10 Specialized Agents)
 
-**Traditional Structured Agents:**
-1. **ResearchPlannerAgent** - Creates structured research plans with ordered tool call sequences
-2. **ResearchAgent** - Gathers company information, sector overview, and peer data
-3. **FinancialAnalysisAgent** - Performs comprehensive financial statement analysis
-4. **ManagementAnalysisAgent** - Analyzes management effectiveness and governance
-5. **TechnicalAnalysisAgent** - Performs technical analysis with indicators
-6. **ValuationAnalysisAgent** - Performs valuation analysis and target price calculation
-7. **ReportAgent** - Synthesizes all data into comprehensive reports
+The system employs **10 specialized agents** organized into three phases. For comprehensive details on each agent's specialization, roles, responsibilities, and tool usage, see **[Agent Specialization Documentation](docs/AGENT_SPECIALIZATION.md)**.
 
-**AI-Powered Iterative Agents** (Default mode):
-- **AIResearchAgent** - Iterative LLM-based research that dynamically selects and executes tools
-- **AIAnalysisAgent** - Comprehensive analysis agent that performs all analysis types (financial, management, technical, valuation) using iterative decision-making
-- **AIReportAgent** - AI-driven report generation where content is created by LLM and PDF generation is handled by tools
+**Quick Overview:**
+
+**Research Phase:**
+- **ResearchPlannerAgent** (Mixed Mode) - Creates structured research plans with ordered tool call sequences
+- **ResearchAgent** (Mixed Mode) - Executes research plans to gather company information, sector overview, and peer data
+- **AIResearchAgent** (Agentic AI Mode) - Iterative LLM-based research that dynamically selects and executes tools
+
+**Analysis Phase:**
+- **FinancialAnalysisAgent** (Mixed Mode) - Performs comprehensive financial statement analysis and ratio interpretation
+- **ManagementAnalysisAgent** (Mixed Mode) - Analyzes management effectiveness and governance
+- **TechnicalAnalysisAgent** (Mixed Mode) - Performs technical analysis with indicators and trends
+- **ValuationAnalysisAgent** (Mixed Mode) - Performs valuation analysis and target price calculation
+- **AIAnalysisAgent** (Agentic AI Mode) - Comprehensive analysis agent that performs all analysis types using iterative decision-making
+
+**Report Phase:**
+- **ReportAgent** (Mixed Mode) - Synthesizes all data into comprehensive reports
+- **AIReportAgent** (Agentic AI Mode) - AI-driven report generation where content is created by LLM
 
 **Agent Selection:**
-- **Default Mode** (AI Mode): Uses AIResearchAgent + AIAnalysisAgent + AIReportAgent for fully iterative LLM-driven workflow
-- **Structured Mode** (`--skip-ai` or `-s`): Uses ResearchPlannerAgent + ResearchAgent + 4 separate Analysis Agents + ReportAgent
+- **Default Mode** (Agentic AI Mode): Uses AIResearchAgent → AIAnalysisAgent → AIReportAgent for fully iterative LLM-driven workflow
+- **Mixed Mode** (`--skip-ai` or `-s`): Uses ResearchPlannerAgent → ResearchAgent → [4 Analysis Agents in Parallel] → ReportAgent
+
+**See [Agent Specialization Documentation](docs/AGENT_SPECIALIZATION.md) for detailed information on each agent's specialization, responsibilities, tools, and when to use each mode.**
 
 #### 🛠️ Tools (15+ Total)
 
@@ -846,7 +854,6 @@ This system meets and exceeds multi-agent system requirements:
 
 - **REQUIREMENTS_CHECKLIST.md** - Detailed requirements verification
 - **IMPLEMENTATION_SUMMARY.md** - Comprehensive implementation details
-- **MULTI_AGENT_README.md** - Agent-specific documentation
 
 ---
 

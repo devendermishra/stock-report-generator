@@ -80,14 +80,30 @@ class MultiAgentOrchestrator:
     """
     LangGraph-based orchestrator for the multi-agent stock research system.
     
-    This orchestrator manages multiple autonomous agents:
-    1. ResearchPlannerAgent - Creates structured research plan with ordered tool calls
-    2. ResearchAgent - Gathers company and sector data based on the plan
-    3. FinancialAnalysisAgent - Performs financial analysis
-    4. ManagementAnalysisAgent - Performs management and governance analysis
-    5. TechnicalAnalysisAgent - Performs technical analysis
-    6. ValuationAnalysisAgent - Performs valuation analysis
-    7. ReportAgent - Synthesizes data into comprehensive reports
+    This orchestrator manages 10 specialized autonomous agents organized into three phases:
+    
+    **Research Phase:**
+    - ResearchPlannerAgent (Structured Mode) - Creates structured research plan with ordered tool calls
+    - ResearchAgent (Structured Mode) - Gathers company and sector data based on the plan
+    - AIResearchAgent (AI Mode) - Iterative LLM-based research with dynamic tool selection
+    
+    **Analysis Phase:**
+    - FinancialAnalysisAgent (Structured Mode) - Performs financial statement analysis and ratios
+    - ManagementAnalysisAgent (Structured Mode) - Performs management and governance analysis
+    - TechnicalAnalysisAgent (Structured Mode) - Performs technical analysis with indicators
+    - ValuationAnalysisAgent (Structured Mode) - Performs valuation analysis and target price
+    - AIAnalysisAgent (AI Mode) - Comprehensive multi-dimensional analysis using iterative decision-making
+    
+    **Report Phase:**
+    - ReportAgent (Structured Mode) - Synthesizes data into comprehensive reports
+    - AIReportAgent (AI Mode) - LLM-powered report generation
+    
+    The orchestrator supports two operational modes:
+    - AI-Powered Iterative Mode (Default): AIResearchAgent → AIAnalysisAgent → AIReportAgent
+    - Structured Workflow Mode: ResearchPlannerAgent → ResearchAgent → [4 Analysis Agents in Parallel] → ReportAgent
+    
+    For detailed information on each agent's specialization, roles, and responsibilities,
+    see docs/AGENT_SPECIALIZATION.md
     """
     
     def __init__(self, openai_api_key: str, use_ai_research: bool = True, use_ai_analysis: bool = True):
