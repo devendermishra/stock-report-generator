@@ -32,3 +32,7 @@ lxml>=5.2.1
 
 # Async HTTP support
 aiohttp>=3.9.1
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
