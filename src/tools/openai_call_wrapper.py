@@ -13,14 +13,48 @@ from openai import OpenAI, AsyncOpenAI
 try:
     from .openai_logger import openai_logger
     from ..utils.metrics import record_llm_request_from_response
+    from ..utils.retry import retry_llm_call, async_retry_llm_call
 except ImportError:
     from tools.openai_logger import openai_logger
     try:
         from utils.metrics import record_llm_request_from_response
     except ImportError:
         record_llm_request_from_response = None
+    try:
+        from utils.retry import retry_llm_call, async_retry_llm_call
+    except ImportError:
+        retry_llm_call = lambda func: func  # No-op if retry not available
+        async_retry_llm_call = lambda func: func  # No-op if retry not available
 
 logger = logging.getLogger(__name__)
+
+
+def _make_openai_call(
+    client: OpenAI,
+    model: str,
+    messages: List[Dict[str, str]],
+    **kwargs
+):
+    """
+    Internal function to make OpenAI API call with retry logic.
+    
+    Args:
+        client: OpenAI client instance
+        model: Model name
+        messages: List of message dictionaries
+        **kwargs: Additional arguments for chat.completions.create
+    
+    Returns:
+        OpenAI chat completion response
+    """
+    @retry_llm_call()
+    def _call():
+        return client.chat.completions.create(
+            model=model,
+            messages=messages,
+            **kwargs
+        )
+    return _call()
 
 
 def logged_chat_completion(
@@ -46,8 +80,9 @@ def logged_chat_completion(
     start_time = time.time()
     
     try:
-        # Make the API call
-        response = client.chat.completions.create(
+        # Make the API call with retry logic
+        response = _make_openai_call(
+            client=client,
             model=model,
             messages=messages,
             **kwargs
@@ -107,6 +142,34 @@ def logged_chat_completion(
         raise
 
 
+async def _make_async_openai_call(
+    client: AsyncOpenAI,
+    model: str,
+    messages: List[Dict[str, str]],
+    **kwargs
+):
+    """
+    Internal async function to make OpenAI API call with retry logic.
+    
+    Args:
+        client: AsyncOpenAI client instance
+        model: Model name
+        messages: List of message dictionaries
+        **kwargs: Additional arguments for chat.completions.create
+    
+    Returns:
+        OpenAI async chat completion response
+    """
+    @async_retry_llm_call()
+    async def _call():
+        return await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            **kwargs
+        )
+    return await _call()
+
+
 async def logged_async_chat_completion(
     client: AsyncOpenAI,
     model: str,
@@ -130,8 +193,9 @@ async def logged_async_chat_completion(
     start_time = time.time()
     
     try:
-        # Make the API call
-        response = await client.chat.completions.create(
+        # Make the API call with retry logic
+        response = await _make_async_openai_call(
+            client=client,
             model=model,
             messages=messages,
             **kwargs

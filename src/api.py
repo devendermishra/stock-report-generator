@@ -114,7 +114,7 @@ class PDFRequest(BaseModel):
     """Request model for PDF generation from markdown."""
     markdown_content: str = Field(..., description="Markdown content to convert to PDF")
     stock_symbol: Optional[str] = Field(None, description="Stock symbol for filename (optional)")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -134,7 +134,7 @@ async def startup_event():
         if not config_validation["openai_key"]:
             logger.error("OpenAI API key not found. Please set OPENAI_API_KEY environment variable.")
             raise ValueError("OpenAI API key is required")
-        
+
         # Initialize circuit breaker with Config values
         circuit_breaker = get_api_circuit_breaker()
         logger.info(
@@ -142,7 +142,7 @@ async def startup_event():
             f"window={Config.CIRCUIT_BREAKER_TIME_WINDOW_SECONDS}s, "
             f"recovery={Config.CIRCUIT_BREAKER_RECOVERY_TIMEOUT_SECONDS}s"
         )
-        
+
         # Initialize AI mode generator (default)
         generator_ai = StockReportGenerator(
             use_ai_research=True,
@@ -150,7 +150,7 @@ async def startup_event():
             skip_pdf=True  # Default to markdown only for API
         )
         logger.info("Stock Report Generator (AI mode) initialized successfully")
-        
+
         # Initialize structured workflow generator (for skip-ai mode)
         generator_structured = StockReportGenerator(
             use_ai_research=False,
@@ -195,7 +195,7 @@ async def health_check():
     # Ensure circuit breaker is initialized
     if circuit_breaker is None:
         circuit_breaker = get_api_circuit_breaker()
-    
+
     circuit_state = circuit_breaker.get_state()
     return {
         "status": "healthy",
@@ -219,23 +219,23 @@ async def health_check():
 async def generate_report(request: Request, symbol: str, s: bool = False):
     """
     Generate a stock research report and return as plain text markdown.
-    
+
     Simple GET endpoint to generate stock reports.
-    
+
     Args:
         request: FastAPI Request object (for rate limiting)
         symbol: NSE stock symbol (e.g., 'RELIANCE', 'TCS')
         s: Skip AI mode flag. If True, uses structured workflow instead of AI agents (default: False)
-        
+
     Returns:
         Plain text markdown report
-        
+
     Raises:
         HTTPException: If report generation fails, rate limit exceeded, or circuit breaker is open
-        
+
     Rate Limit:
         Configurable via API_RATE_LIMIT_PER_MINUTE environment variable (default: 2 per minute)
-        
+
     Examples:
         GET /report/RELIANCE
         GET /report/RELIANCE?s=true
@@ -244,7 +244,7 @@ async def generate_report(request: Request, symbol: str, s: bool = False):
     # Ensure circuit breaker is initialized
     if circuit_breaker is None:
         circuit_breaker = get_api_circuit_breaker()
-    
+
     # Check circuit breaker state
     if circuit_breaker.is_open():
         logger.warning("Circuit breaker is OPEN - rejecting request")
@@ -252,10 +252,10 @@ async def generate_report(request: Request, symbol: str, s: bool = False):
             status_code=503,
             detail="Service temporarily unavailable - Circuit breaker is open due to repeated failures"
         )
-    
+
     # Select the appropriate generator based on skip-ai mode
     generator = generator_structured if s else generator_ai
-    
+
     if generator is None:
         circuit_breaker.record_failure()
         mode = "structured" if s else "AI"
@@ -263,22 +263,22 @@ async def generate_report(request: Request, symbol: str, s: bool = False):
             status_code=503,
             detail=f"Stock Report Generator ({mode} mode) not initialized"
         )
-    
+
     try:
         logger.info(f"Received report generation request for {symbol} (skip_ai={s}, mode={'structured' if s else 'AI'})")
-        
+
         # Clean stock symbol (remove .NS suffix if present)
         stock_symbol = symbol.upper()
         if stock_symbol.endswith('.NS'):
             stock_symbol = stock_symbol[:-3]
-        
+
         # Generate report using the appropriate generator
         results = await generator.generate_report(
             stock_symbol=stock_symbol,
             company_name=None,  # Auto-fetch
             sector=None  # Auto-fetch
         )
-        
+
         # Check if generation was successful
         if results.get("workflow_status") == "failed":
             error_msg = results.get("error", "Unknown error occurred")
@@ -289,10 +289,10 @@ async def generate_report(request: Request, symbol: str, s: bool = False):
                 status_code=500,
                 detail=f"Report generation failed: {error_msg}"
             )
-        
+
         # Extract markdown report
         markdown_report = results.get("final_report", "")
-        
+
         if not markdown_report:
             logger.warning(f"No markdown report generated for {stock_symbol}")
             circuit_breaker.record_failure()
@@ -300,13 +300,13 @@ async def generate_report(request: Request, symbol: str, s: bool = False):
                 status_code=500,
                 detail="Report generation completed but no markdown content was produced"
             )
-        
+
         # Record success if we got here
         circuit_breaker.record_success()
-        
+
         # Return as plain text markdown
         return markdown_report
-        
+
     except HTTPException as e:
         # Record failure for HTTP exceptions (except 503 from circuit breaker itself)
         if e.status_code != 503 or "Circuit breaker" not in str(e.detail):
@@ -326,22 +326,22 @@ async def generate_report(request: Request, symbol: str, s: bool = False):
 async def generate_pdf_from_markdown(request: Request, pdf_request: PDFRequest):
     """
     Convert markdown content to PDF format.
-    
+
     Accepts markdown content and returns a PDF file.
-    
+
     Args:
         request: FastAPI Request object (for rate limiting)
         pdf_request: PDFRequest containing markdown content and optional stock symbol
-        
+
     Returns:
         PDF file as Response with PDF content
-        
+
     Raises:
         HTTPException: If PDF generation fails or rate limit exceeded
-        
+
     Rate Limit:
         5 requests per minute
-        
+
     Examples:
         POST /pdf
         {
@@ -351,28 +351,28 @@ async def generate_pdf_from_markdown(request: Request, pdf_request: PDFRequest):
     """
     try:
         logger.info(f"Received PDF generation request (stock_symbol={pdf_request.stock_symbol})")
-        
+
         # Generate filename for download
         if pdf_request.stock_symbol:
             filename = f"{pdf_request.stock_symbol}_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         else:
             filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        
+
         # Create a temporary directory for PDF generation
         with tempfile.TemporaryDirectory() as temp_dir:
             # Initialize PDF generator with temp directory
             pdf_generator = PDFGeneratorTool(output_dir=temp_dir)
-            
+
             # Generate PDF
             pdf_path = pdf_generator.generate_pdf(
                 markdown_content=pdf_request.markdown_content,
                 stock_symbol=pdf_request.stock_symbol
             )
-            
+
             # Read PDF file content before temp directory is cleaned up
             with open(pdf_path, 'rb') as pdf_file:
                 pdf_content = pdf_file.read()
-            
+
             # Return PDF content as response
             return Response(
                 content=pdf_content,
@@ -381,7 +381,7 @@ async def generate_pdf_from_markdown(request: Request, pdf_request: PDFRequest):
                     "Content-Disposition": f"attachment; filename={filename}"
                 }
             )
-            
+
     except Exception as e:
         logger.error(f"Error generating PDF: {e}")
         raise HTTPException(
@@ -392,9 +392,8 @@ async def generate_pdf_from_markdown(request: Request, pdf_request: PDFRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # Run the API server
-    # Updated to use src.api:app since we're now inside src/
     uvicorn.run(
         "src.api:app",
         host="0.0.0.0",

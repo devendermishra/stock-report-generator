@@ -14,6 +14,7 @@ try:
     from ..utils.session_manager import get_session_id, get_session_context
     from ..tools.openai_logger import openai_logger
     from ..utils.metrics import record_llm_request_from_response
+    from ..utils.retry import retry_llm_call, async_retry_llm_call
 except ImportError:
     from utils.session_manager import get_session_id, get_session_context
     from tools.openai_logger import openai_logger
@@ -21,6 +22,11 @@ except ImportError:
         from utils.metrics import record_llm_request_from_response
     except ImportError:
         record_llm_request_from_response = None
+    try:
+        from utils.retry import retry_llm_call, async_retry_llm_call
+    except ImportError:
+        retry_llm_call = lambda func: func  # No-op if retry not available
+        async_retry_llm_call = lambda func: func  # No-op if retry not available
 
 logger = logging.getLogger(__name__)
 
@@ -161,15 +167,20 @@ class LLMGuardrailsWrapper:
             else:
                 messages_with_session = messages
             
-            # Step 3: Make the actual API call
+            # Step 3: Make the actual API call with retry logic
             start_time = time.time()
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages_with_session,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                **kwargs
-            )
+            
+            @retry_llm_call()
+            def _make_call():
+                return self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages_with_session,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs
+                )
+            
+            response = _make_call()
             duration_ms = int((time.time() - start_time) * 1000)
             duration_seconds = (time.time() - start_time)
             
@@ -358,15 +369,20 @@ class LLMGuardrailsWrapper:
             else:
                 messages_with_session = messages
             
-            # Step 3: Make the actual API call
+            # Step 3: Make the actual API call with retry logic
             start_time = time.time()
-            response = await self.async_client.chat.completions.create(
-                model=self.model_name,
-                messages=messages_with_session,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                **kwargs
-            )
+            
+            @async_retry_llm_call()
+            async def _make_call():
+                return await self.async_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages_with_session,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs
+                )
+            
+            response = await _make_call()
             duration_ms = int((time.time() - start_time) * 1000)
             duration_seconds = (time.time() - start_time)
             

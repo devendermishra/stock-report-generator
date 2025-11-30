@@ -51,6 +51,15 @@ class Config:
     ENABLE_METRICS = os.getenv("ENABLE_METRICS", "false").lower() == "true"  # Default: disabled
     METRICS_PORT = int(os.getenv("METRICS_PORT", "8000"))  # Port for Prometheus metrics endpoint
     
+    # Retry Configuration
+    LLM_RETRY_MAX_ATTEMPTS = int(os.getenv("LLM_RETRY_MAX_ATTEMPTS", "3"))  # Default: 3 retries
+    LLM_RETRY_INITIAL_DELAY = float(os.getenv("LLM_RETRY_INITIAL_DELAY", "1.0"))  # Default: 1 second
+    LLM_RETRY_MAX_DELAY = float(os.getenv("LLM_RETRY_MAX_DELAY", "60.0"))  # Default: 60 seconds
+    
+    TOOL_RETRY_MAX_ATTEMPTS = int(os.getenv("TOOL_RETRY_MAX_ATTEMPTS", "3"))  # Default: 3 retries
+    TOOL_RETRY_INITIAL_DELAY = float(os.getenv("TOOL_RETRY_INITIAL_DELAY", "1.0"))  # Default: 1 second
+    TOOL_RETRY_MAX_DELAY = float(os.getenv("TOOL_RETRY_MAX_DELAY", "30.0"))  # Default: 30 seconds
+    
     @classmethod
     def validate_config(cls) -> Dict[str, bool]:
         """Validate that all required configuration is present."""

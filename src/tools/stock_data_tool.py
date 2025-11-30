@@ -17,11 +17,68 @@ from .stock_data_models import StockMetrics, PriceData, CompanyInfo
 from .stock_data_calculator import StockDataCalculator
 from .stock_data_validator import StockDataValidator
 
+try:
+    from ..utils.retry import retry_tool_call
+    from ..config import Config
+except ImportError:
+    from utils.retry import retry_tool_call
+    from config import Config
+
 logger = logging.getLogger(__name__)
 
 # Initialize calculator and validator
 _calculator = StockDataCalculator()
 _validator = StockDataValidator()
+
+
+def _get_ticker_with_retry(symbol: str):
+    """
+    Get yfinance Ticker object with retry logic.
+    
+    Args:
+        symbol: Stock symbol
+    
+    Returns:
+        yfinance Ticker object
+    """
+    @retry_tool_call()
+    def _get_ticker():
+        return yf.Ticker(symbol)
+    return _get_ticker()
+
+
+def _get_ticker_info_with_retry(ticker):
+    """
+    Get ticker info with retry logic.
+    
+    Args:
+        ticker: yfinance Ticker object
+    
+    Returns:
+        Dictionary with ticker info
+    """
+    @retry_tool_call()
+    def _get_info():
+        return ticker.info
+    return _get_info()
+
+
+def _get_ticker_history_with_retry(ticker, period="1d", interval="1d"):
+    """
+    Get ticker history with retry logic.
+    
+    Args:
+        ticker: yfinance Ticker object
+        period: Period for historical data
+        interval: Interval for historical data
+    
+    Returns:
+        DataFrame with historical data
+    """
+    @retry_tool_call()
+    def _get_history():
+        return ticker.history(period=period, interval=interval)
+    return _get_history()
 
 @tool(
     description="Get comprehensive stock metrics including current price, market cap, P/E ratio, volume, beta, "
@@ -54,17 +111,17 @@ def get_stock_metrics(symbol: str) -> Dict[str, Any]:
             
         logger.info(f"Fetching stock metrics for {symbol}")
         
-        # Get stock data
-        stock = yf.Ticker(symbol)
-        info = stock.info
+        # Get stock data with retry
+        stock = _get_ticker_with_retry(symbol)
+        info = _get_ticker_info_with_retry(stock)
         
         # Validate symbol exists
         if not info or 'symbol' not in info:
             logger.error(f"Symbol {symbol} not found")
             return {"error": f"Symbol {symbol} not found"}
         
-        # Get current price data
-        hist = stock.history(period="1d")
+        # Get current price data with retry
+        hist = _get_ticker_history_with_retry(stock, period="1d")
         if hist.empty:
             logger.error(f"No price data available for {symbol}")
             return {"error": f"No price data available for {symbol}"}
@@ -134,8 +191,8 @@ def get_company_info(symbol: str) -> Dict[str, Any]:
             
         logger.info(f"Fetching company info for {symbol}")
         
-        stock = yf.Ticker(symbol)
-        info = stock.info
+        stock = _get_ticker_with_retry(symbol)
+        info = _get_ticker_info_with_retry(stock)
         
         if not info or 'symbol' not in info:
             return {"error": f"Symbol {symbol} not found"}
@@ -189,8 +246,8 @@ def validate_symbol(symbol: str) -> Dict[str, Any]:
             
         logger.info(f"Validating symbol {symbol}")
         
-        stock = yf.Ticker(symbol)
-        info = stock.info
+        stock = _get_ticker_with_retry(symbol)
+        info = _get_ticker_info_with_retry(stock)
         
         if not info or 'symbol' not in info:
             return {
@@ -199,8 +256,8 @@ def validate_symbol(symbol: str) -> Dict[str, Any]:
                 "error": "Symbol not found"
             }
         
-        # Try to get recent price data
-        hist = stock.history(period="1d")
+        # Try to get recent price data with retry
+        hist = _get_ticker_history_with_retry(stock, period="1d")
         if hist.empty:
             return {
                 "valid": False,
@@ -253,8 +310,8 @@ class StockDataTool:
             if not symbol.endswith('.NS'):
                 symbol = f"{symbol}.NS"
                 
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
+            ticker = _get_ticker_with_retry(symbol)
+            info = _get_ticker_info_with_retry(ticker)
             
             # Debug: Log available fields
             logger.info(f"Available fields for {symbol}: {list(info.keys())[:20]}...")  # First 20 fields
@@ -350,8 +407,8 @@ class StockDataTool:
             if not symbol.endswith('.NS'):
                 symbol = f"{symbol}.NS"
                 
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period=period, interval=interval)
+            ticker = _get_ticker_with_retry(symbol)
+            hist = _get_ticker_history_with_retry(ticker, period=period, interval=interval)
             
             price_data = []
             for date, row in hist.iterrows():
@@ -510,8 +567,8 @@ class StockDataTool:
             if not symbol.endswith('.NS'):
                 symbol = f"{symbol}.NS"
                 
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
+            ticker = _get_ticker_with_retry(symbol)
+            info = _get_ticker_info_with_retry(ticker)
             
             company_info = {
                 'name': info.get('longName', ''),

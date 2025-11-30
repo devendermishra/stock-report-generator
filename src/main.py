@@ -23,12 +23,17 @@ try:
     from .graph.multi_agent_graph import MultiAgentOrchestrator
     from .tools.stock_data_tool import validate_symbol as tool_validate_symbol
     from .tools.stock_data_tool import get_company_info as tool_get_company_info
+    from .utils.retry import retry_tool_call
 except ImportError:
     # Fall back to absolute imports (when run as script)
     from config import Config
     from graph.multi_agent_graph import MultiAgentOrchestrator
     from tools.stock_data_tool import validate_symbol as tool_validate_symbol
     from tools.stock_data_tool import get_company_info as tool_get_company_info
+    try:
+        from utils.retry import retry_tool_call
+    except ImportError:
+        retry_tool_call = lambda func: func  # No-op if retry not available
 
 # Import enhanced logging and session management
 try:
@@ -141,12 +146,21 @@ class StockReportGenerator:
                 if stock_symbol.endswith('.NS'):
                     stock_symbol = stock_symbol[:-3]
                 
-                # Validate symbol against NSE via tool
-                validation = tool_validate_symbol.invoke({"symbol": stock_symbol})
+                # Validate symbol against NSE via tool (with retry)
+                @retry_tool_call()
+                def _validate_symbol(symbol):
+                    return tool_validate_symbol.invoke({"symbol": symbol})
+                
+                validation = _validate_symbol(stock_symbol)
                 if not validation or not validation.get("valid", False):
                     raise ValueError(validation.get("error", "Symbol not found on NSE"))
-                # Fetch company info from tool to populate missing fields
-                info = tool_get_company_info.invoke({"symbol": stock_symbol}) or {}
+                
+                # Fetch company info from tool to populate missing fields (with retry)
+                @retry_tool_call()
+                def _get_company_info(symbol):
+                    return tool_get_company_info.invoke({"symbol": symbol})
+                
+                info = _get_company_info(stock_symbol) or {}
                 if not company_name:
                     company_name = info.get("company_name") or info.get("short_name") or validation.get("company_name") or f"Company {stock_symbol}"
                 if not sector:

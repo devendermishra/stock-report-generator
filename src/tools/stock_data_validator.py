@@ -50,10 +50,20 @@ class StockDataValidator:
                 
             logger.info(f"Validating symbol: {clean_symbol}")
             
-            # Try to get basic info from yfinance
+            # Try to get basic info from yfinance with retry
             import yfinance as yf
-            ticker = yf.Ticker(yf_symbol)
-            info = ticker.info
+            from ..utils.retry import retry_tool_call
+            
+            @retry_tool_call()
+            def _get_ticker():
+                return yf.Ticker(yf_symbol)
+            
+            @retry_tool_call()
+            def _get_info(t):
+                return t.info
+            
+            ticker = _get_ticker()
+            info = _get_info(ticker)
             
             # Check if we got valid data
             if not info or len(info) < 5:  # Very basic info should have at least 5 fields
@@ -91,11 +101,21 @@ class StockDataValidator:
         """
         try:
             import yfinance as yf
+            from ..utils.retry import retry_tool_call
             
-            # First try yfinance
+            # First try yfinance with retry
             yf_symbol = f"{symbol}.NS" if not symbol.endswith('.NS') else symbol
-            ticker = yf.Ticker(yf_symbol)
-            info = ticker.info
+            
+            @retry_tool_call()
+            def _get_ticker():
+                return yf.Ticker(yf_symbol)
+            
+            @retry_tool_call()
+            def _get_info(t):
+                return t.info
+            
+            ticker = _get_ticker()
+            info = _get_info(ticker)
             
             company_name = info.get('longName', '')
             sector = info.get('sector', '')

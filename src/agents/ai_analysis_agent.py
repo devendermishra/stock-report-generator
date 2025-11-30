@@ -12,6 +12,7 @@ This is an alternative to the separate Financial, Management, Technical, and Val
 """
 
 import logging
+import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import json
@@ -38,6 +39,7 @@ try:
     from ..config import Config
     from ..utils.metrics import record_llm_request
     from ..tools.openai_logger import openai_logger
+    from ..utils.retry import invoke_tool_with_retry, call_llm_with_retry
 except ImportError:
     from agents.base_agent import BaseAgent, AgentState
     from agents.ai_analysis_helpers import (
@@ -51,6 +53,10 @@ except ImportError:
     from config import Config
     from utils.metrics import record_llm_request
     from tools.openai_logger import openai_logger
+    try:
+        from utils.retry import invoke_tool_with_retry, call_llm_with_retry
+    except ImportError:
+        from utils.retry_fallback import invoke_tool_with_retry, call_llm_with_retry
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -399,10 +405,10 @@ CRITICAL RULES:
                         openai_messages.append({"role": role, "content": msg.content})
                 
                 # Record start time for metrics
-                import time
                 llm_start_time = time.time()
                 
-                response = await self.llm_with_tools.ainvoke(messages)
+                # Make LLM call with retry logic
+                response = await call_llm_with_retry(self.llm_with_tools, messages)
                 
                 # Calculate duration for metrics
                 llm_duration = time.time() - llm_start_time
@@ -518,11 +524,12 @@ CRITICAL RULES:
                             ))
                             continue
                         
-                        # Call tool
-                        try:
-                            result = await tool_obj.ainvoke(tool_args)
-                        except AttributeError:
-                            result = tool_obj.invoke(tool_args)
+                        # Call tool with retry logic
+                        result = await invoke_tool_with_retry(
+                            tool=tool_obj,
+                            args=tool_args,
+                            is_async=True
+                        )
                         
                         # Store results
                         gathered_data[tool_name] = result
