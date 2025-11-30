@@ -338,3 +338,4 @@ class TestCreateManagementDiscussionSection:
         # Should use summary when outlook is default placeholder
         assert "Management summary text" in section.content or "being processed" in section.content.lower()
 
+

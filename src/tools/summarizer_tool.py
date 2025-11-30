@@ -13,6 +13,10 @@ from langchain_core.tools import tool
 try:
     # Try relative imports first (when run as module)
     from ..tools.openai_logger import openai_logger
+    from ..tools.llm_guardrails_wrapper import (
+        initialize_llm_guardrails,
+        get_llm_wrapper
+    )
     from ..tools.summarizer_prompts import (
         create_summarization_prompt,
         create_insight_extraction_prompt,
@@ -27,6 +31,10 @@ try:
 except ImportError:
     # Fall back to absolute imports (when run as script)
     from tools.openai_logger import openai_logger
+    from tools.llm_guardrails_wrapper import (
+        initialize_llm_guardrails,
+        get_llm_wrapper
+    )
     from tools.summarizer_prompts import (
         create_summarization_prompt,
         create_insight_extraction_prompt,
@@ -70,6 +78,12 @@ def initialize_summarizer(api_key: str, model: str = None):
     _api_key = api_key
     _model = model or Config.DEFAULT_MODEL
     openai.api_key = api_key
+    # Initialize guardrails for LLM call validation
+    try:
+        initialize_llm_guardrails(api_key, _model)
+        logger.info("Guardrails initialized for LLM call validation")
+    except Exception as e:
+        logger.warning(f"Failed to initialize guardrails: {e}. Continuing without guardrails validation.")
 
 @tool(
     description="Summarize financial documents, reports, and text content with AI-powered analysis. Extracts key points, sentiment, and insights. Perfect for processing earnings reports, analyst notes, and financial documents.",
@@ -112,36 +126,41 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
         # Prepare the prompt
         prompt = create_summarization_prompt(text, max_length, focus_areas)
         
-        # Call OpenAI API with logging
+        # Call OpenAI API with guardrails validation and logging
         import time
         start_time = time.time()
         
         try:
-            response = openai.chat.completions.create(
-                model=_model,
-                messages=[
-                    {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_length * 2,  # Allow for structured output
-                temperature=0.1
-            )
+            # Use guardrails wrapper if available, otherwise fallback to direct call
+            llm_wrapper = get_llm_wrapper()
+            if llm_wrapper:
+                response = llm_wrapper.chat_completion(
+                    messages=[
+                        {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=max_length * 2,  # Allow for structured output
+                    temperature=0.1
+                )
+            else:
+                # Fallback to direct OpenAI call with logging
+                from .openai_call_wrapper import logged_chat_completion
+                from openai import OpenAI as OpenAIClient
+                client = OpenAIClient(api_key=_api_key)
+                response = logged_chat_completion(
+                    client=client,
+                    model=_model,
+                    messages=[
+                        {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=max_length * 2,  # Allow for structured output
+                    temperature=0.1,
+                    agent_name="SummarizerTool"
+                )
             
             duration_ms = int((time.time() - start_time) * 1000)
             result_text = response.choices[0].message.content
-            
-            # Log the OpenAI completion
-            openai_logger.log_chat_completion(
-                model=_model,
-                messages=[
-                    {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
-                    {"role": "user", "content": prompt}
-                ],
-                response=result_text,
-                usage=response.usage.__dict__ if response.usage else None,
-                duration_ms=duration_ms,
-                agent_name="SummarizerTool"
-            )
             
         except Exception as api_error:
             logger.error(f"OpenAI API error: {api_error}")
@@ -233,17 +252,35 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
         # Prepare the prompt
         prompt = create_insight_extraction_prompt(text, categories)
         
-        # Call OpenAI API
+        # Call OpenAI API with guardrails validation
         try:
-            response = openai.chat.completions.create(
-                model=_model,
-                messages=[
-                    {"role": "system", "content": "You are a financial analyst expert at extracting insights from documents."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1000,
-                temperature=0.1
-            )
+            # Use guardrails wrapper if available, otherwise fallback to direct call
+            llm_wrapper = get_llm_wrapper()
+            if llm_wrapper:
+                response = llm_wrapper.chat_completion(
+                    messages=[
+                        {"role": "system", "content": "You are a financial analyst expert at extracting insights from documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=1000,
+                    temperature=0.1
+                )
+            else:
+                # Fallback to direct OpenAI call with logging
+                from .openai_call_wrapper import logged_chat_completion
+                from openai import OpenAI as OpenAIClient
+                client = OpenAIClient(api_key=_api_key)
+                response = logged_chat_completion(
+                    client=client,
+                    model=_model,
+                    messages=[
+                        {"role": "system", "content": "You are a financial analyst expert at extracting insights from documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=1000,
+                    temperature=0.1,
+                    agent_name="SummarizerTool"
+                )
             
             result_text = response.choices[0].message.content
             
@@ -306,6 +343,12 @@ class SummarizerTool:
         self.api_key = api_key
         self.model = model or Config.DEFAULT_MODEL
         openai.api_key = api_key
+        # Initialize guardrails for LLM call validation
+        try:
+            initialize_llm_guardrails(api_key, self.model)
+            logger.info("Guardrails initialized for LLM call validation")
+        except Exception as e:
+            logger.warning(f"Failed to initialize guardrails: {e}. Continuing without guardrails validation.")
         
     def summarize_text(
         self,
@@ -339,36 +382,41 @@ class SummarizerTool:
             # Prepare the prompt
             prompt = create_summarization_prompt(text, max_length, focus_areas)
             
-            # Call OpenAI API with logging
+            # Call OpenAI API with guardrails validation and logging
             import time
             start_time = time.time()
             
             try:
-                response = openai.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=max_length * 2,  # Allow for structured output
-                    temperature=0.1
-                )
+                # Use guardrails wrapper if available, otherwise fallback to direct call
+                llm_wrapper = get_llm_wrapper()
+                if llm_wrapper:
+                    response = llm_wrapper.chat_completion(
+                        messages=[
+                            {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=max_length * 2,  # Allow for structured output
+                        temperature=0.1
+                    )
+                else:
+                    # Fallback to direct OpenAI call with logging
+                    from .openai_call_wrapper import logged_chat_completion
+                    from openai import OpenAI as OpenAIClient
+                    client = OpenAIClient(api_key=self.api_key)
+                    response = logged_chat_completion(
+                        client=client,
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=max_length * 2,  # Allow for structured output
+                        temperature=0.1,
+                        agent_name="SummarizerTool"
+                    )
                 
                 duration_ms = int((time.time() - start_time) * 1000)
                 result_text = response.choices[0].message.content
-                
-                # Log the OpenAI completion
-                openai_logger.log_chat_completion(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": "You are a financial analyst expert at summarizing complex documents."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    response=result_text,
-                    usage=response.usage.__dict__ if response.usage else None,
-                    duration_ms=duration_ms,
-                    agent_name="SummarizerTool"
-                )
                 
             except Exception as api_error:
                 openai_logger.log_error(api_error, self.model, "SummarizerTool")
@@ -437,15 +485,33 @@ class SummarizerTool:
             # Create prompt for multi-chunk summarization
             prompt = create_document_chunks_prompt(combined_text, max_summary_length)
             
-            response = openai.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a senior financial analyst expert at analyzing and summarizing complex financial documents."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_summary_length * 2,
-                temperature=0.1
-            )
+            # Use guardrails wrapper if available, otherwise fallback to direct call
+            llm_wrapper = get_llm_wrapper()
+            if llm_wrapper:
+                response = llm_wrapper.chat_completion(
+                    messages=[
+                        {"role": "system", "content": "You are a senior financial analyst expert at analyzing and summarizing complex financial documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=max_summary_length * 2,
+                    temperature=0.1
+                )
+            else:
+                # Fallback to direct OpenAI call with logging
+                from .openai_call_wrapper import logged_chat_completion
+                from openai import OpenAI as OpenAIClient
+                client = OpenAIClient(api_key=self.api_key)
+                response = logged_chat_completion(
+                    client=client,
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a senior financial analyst expert at analyzing and summarizing complex financial documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=max_summary_length * 2,
+                    temperature=0.1,
+                    agent_name="SummarizerTool"
+                )
             
             result_text = response.choices[0].message.content
             
@@ -515,15 +581,33 @@ class SummarizerTool:
                 
             prompt = create_insight_categorization_prompt(text, insight_categories)
             
-            response = openai.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a financial analyst expert at extracting insights from financial documents."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1500,
-                temperature=0.1
-            )
+            # Use guardrails wrapper if available, otherwise fallback to direct call
+            llm_wrapper = get_llm_wrapper()
+            if llm_wrapper:
+                response = llm_wrapper.chat_completion(
+                    messages=[
+                        {"role": "system", "content": "You are a financial analyst expert at extracting insights from financial documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=1500,
+                    temperature=0.1
+                )
+            else:
+                # Fallback to direct OpenAI call with logging
+                from .openai_call_wrapper import logged_chat_completion
+                from openai import OpenAI as OpenAIClient
+                client = OpenAIClient(api_key=self.api_key)
+                response = logged_chat_completion(
+                    client=client,
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a financial analyst expert at extracting insights from financial documents."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=1500,
+                    temperature=0.1,
+                    agent_name="SummarizerTool"
+                )
             
             result_text = response.choices[0].message.content
             
@@ -555,11 +639,25 @@ class SummarizerTool:
             True if API key is valid, False otherwise
         """
         try:
-            response = openai.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": "Test"}],
-                max_tokens=5
-            )
+            # Use guardrails wrapper if available, otherwise fallback to direct call
+            llm_wrapper = get_llm_wrapper()
+            if llm_wrapper:
+                response = llm_wrapper.chat_completion(
+                    messages=[{"role": "user", "content": "Test"}],
+                    max_tokens=5
+                )
+            else:
+                # Fallback to direct OpenAI call with logging
+                from .openai_call_wrapper import logged_chat_completion
+                from openai import OpenAI as OpenAIClient
+                client = OpenAIClient(api_key=self.api_key)
+                response = logged_chat_completion(
+                    client=client,
+                    model=self.model,
+                    messages=[{"role": "user", "content": "Test"}],
+                    max_tokens=5,
+                    agent_name="SummarizerTool"
+                )
             return True
         except Exception as e:
             logger.error(f"API key validation failed: {e}")

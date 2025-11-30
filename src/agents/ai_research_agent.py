@@ -278,7 +278,67 @@ IMPORTANT:
         for iteration in range(self.max_iterations):
             try:
                 # Step 1: LLM decides next action
+                # Convert LangChain messages to OpenAI format for logging
+                openai_messages = []
+                for msg in messages:
+                    if hasattr(msg, 'content'):
+                        # Determine role based on message type
+                        msg_class = msg.__class__.__name__ if hasattr(msg, '__class__') else ''
+                        if 'Human' in msg_class:
+                            role = 'user'
+                        elif 'AIMessage' in msg_class or 'Assistant' in msg_class:
+                            role = 'assistant'
+                        elif 'Tool' in msg_class:
+                            role = 'tool'
+                        else:
+                            role = 'user'  # Default
+                        openai_messages.append({"role": role, "content": msg.content})
+                
+                # Record start time for metrics
+                import time
+                llm_start_time = time.time()
+                
                 response = await self.llm_with_tools.ainvoke(messages)
+                
+                # Calculate duration for metrics
+                llm_duration = time.time() - llm_start_time
+                
+                # Record metrics for LangChain LLM call
+                try:
+                    from ..utils.metrics import record_llm_request
+                    # Try to extract usage info from response if available
+                    request_tokens = None
+                    response_tokens = None
+                    if hasattr(response, 'response_metadata') and response.response_metadata:
+                        usage = response.response_metadata.get('token_usage', {})
+                        if usage:
+                            request_tokens = usage.get('prompt_tokens')
+                            response_tokens = usage.get('completion_tokens')
+                    
+                    record_llm_request(
+                        model=Config.DEFAULT_MODEL,
+                        agent_name="AIResearchAgent",
+                        request_tokens=request_tokens,
+                        response_tokens=response_tokens,
+                        duration_seconds=llm_duration,
+                        success=True
+                    )
+                except Exception as metrics_error:
+                    self.logger.warning(f"Failed to record metrics: {metrics_error}")
+                
+                # Log prompt and response
+                try:
+                    from ..tools.openai_logger import openai_logger
+                    response_content = response.content if hasattr(response, 'content') else str(response)
+                    openai_logger.log_chat_completion(
+                        model=Config.DEFAULT_MODEL,
+                        messages=openai_messages,
+                        response=response_content,
+                        agent_name="AIResearchAgent"
+                    )
+                except Exception as log_error:
+                    self.logger.warning(f"Failed to log prompt/response: {log_error}")
+                
                 messages.append(response)
                 
                 # Check if LLM wants to finish
@@ -402,6 +462,22 @@ IMPORTANT:
                 messages.extend(tool_results)
                 
             except Exception as e:
+                # Record failed LLM request metrics if this was an LLM call failure
+                try:
+                    from ..utils.metrics import record_llm_request
+                    if 'llm_start_time' in locals():
+                        llm_duration = time.time() - llm_start_time
+                        record_llm_request(
+                            model=Config.DEFAULT_MODEL,
+                            agent_name="AIResearchAgent",
+                            request_tokens=None,
+                            response_tokens=None,
+                            duration_seconds=llm_duration,
+                            success=False
+                        )
+                except Exception:
+                    pass  # Don't fail on metrics errors
+                
                 error_msg = f"Agent loop iteration {iteration + 1} failed: {str(e)}"
                 self.logger.error(error_msg)
                 errors.append(error_msg)

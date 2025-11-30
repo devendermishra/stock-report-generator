@@ -36,3 +36,14 @@ aiohttp>=3.9.1
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
+
+# LLM Guardrails
+guardrails-ai>=0.4.0
+
+# Metrics
+prometheus-client>=0.19.0
+
+# FastAPI and ASGI server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+slowapi>=0.1.9

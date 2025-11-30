@@ -1,12 +1,21 @@
 """
 OpenAI Chat Logging Utility.
-Provides structured logging for OpenAI chat completions.
+Provides structured logging for OpenAI chat completions with separate prompt/output logging.
 """
 
 import logging
+import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from dataclasses import dataclass
+
+# Import session manager and logging config
+try:
+    from ..utils.session_manager import get_session_id, get_session_context
+    from ..utils.logging_config import get_prompt_logger, get_output_logger
+except ImportError:
+    from utils.session_manager import get_session_id, get_session_context
+    from utils.logging_config import get_prompt_logger, get_output_logger
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +29,9 @@ class ChatLogEntry:
     tokens_used: Optional[int] = None
     cost_estimate: Optional[float] = None
     duration_ms: Optional[int] = None
+    session_id: Optional[str] = None
+    agent_name: Optional[str] = None
+    stock_symbol: Optional[str] = None
 
 class OpenAILogger:
     """
@@ -59,7 +71,7 @@ class OpenAILogger:
         agent_name: Optional[str] = None
     ) -> ChatLogEntry:
         """
-        Log a chat completion request and response.
+        Log a chat completion request and response with separate prompt/output logging.
         
         Args:
             model: Model used for completion
@@ -73,6 +85,11 @@ class OpenAILogger:
             ChatLogEntry object
         """
         try:
+            # Get session ID and context
+            session_id = get_session_id()
+            context = get_session_context()
+            stock_symbol = context.get('stock_symbol')
+            
             # Calculate token usage and cost
             tokens_used = None
             cost_estimate = None
@@ -95,10 +112,19 @@ class OpenAILogger:
                 response=response,
                 tokens_used=tokens_used,
                 cost_estimate=cost_estimate,
-                duration_ms=duration_ms
+                duration_ms=duration_ms,
+                session_id=session_id,
+                agent_name=agent_name,
+                stock_symbol=stock_symbol
             )
             
-            # Log the completion
+            # Log prompts separately
+            self._log_prompt(log_entry, agent_name)
+            
+            # Log outputs separately
+            self._log_output(log_entry, agent_name)
+            
+            # Log the completion details (summary)
             self._log_completion_details(log_entry, agent_name)
             
             return log_entry
@@ -112,23 +138,109 @@ class OpenAILogger:
                 response=response
             )
     
+    def _log_prompt(self, entry: ChatLogEntry, agent_name: Optional[str] = None):
+        """Log prompt separately to prompts.log in simple format."""
+        try:
+            prompt_logger = get_prompt_logger()
+            
+            # Check if logger has handlers
+            if not prompt_logger.handlers:
+                self.logger.warning("Prompt logger has no handlers. Logging setup may not be complete.")
+                return
+            
+            agent = agent_name or entry.agent_name or "Unknown"
+            session = entry.session_id or "N/A"
+            symbol = entry.stock_symbol or "N/A"
+            
+            # Simple, readable format - write all at once to ensure it's flushed
+            log_content = (
+                f"\n{'='*80}\n"
+                f"TIMESTAMP: {entry.timestamp.isoformat()}\n"
+                f"SESSION ID: {session}\n"
+                f"STOCK SYMBOL: {symbol}\n"
+                f"AGENT: {agent}\n"
+                f"MODEL: {entry.model}\n"
+                f"MESSAGE COUNT: {len(entry.messages)}\n"
+                f"{'-'*80}\n"
+                f"MESSAGES:\n"
+            )
+            
+            # Add each message
+            for i, msg in enumerate(entry.messages, 1):
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')
+                log_content += f"\n--- Message {i} ({role.upper()}) ---\n{content}\n"
+            
+            log_content += f"{'='*80}\n"
+            
+            # Write to logger and flush
+            prompt_logger.info(log_content)
+            # Force flush all handlers
+            for handler in prompt_logger.handlers:
+                try:
+                    handler.flush()
+                except Exception as flush_error:
+                    self.logger.warning(f"Failed to flush handler: {flush_error}")
+            
+        except Exception as e:
+            self.logger.error(f"Error logging prompt: {e}", exc_info=True)
+    
+    def _log_output(self, entry: ChatLogEntry, agent_name: Optional[str] = None):
+        """Log output separately to outputs.log in simple format."""
+        try:
+            output_logger = get_output_logger()
+            
+            # Check if logger has handlers
+            if not output_logger.handlers:
+                self.logger.warning("Output logger has no handlers. Logging setup may not be complete.")
+                return
+            
+            agent = agent_name or entry.agent_name or "Unknown"
+            session = entry.session_id or "N/A"
+            symbol = entry.stock_symbol or "N/A"
+            
+            # Simple, readable format - write all at once to ensure it's flushed
+            log_content = (
+                f"\n{'='*80}\n"
+                f"TIMESTAMP: {entry.timestamp.isoformat()}\n"
+                f"SESSION ID: {session}\n"
+                f"STOCK SYMBOL: {symbol}\n"
+                f"AGENT: {agent}\n"
+                f"MODEL: {entry.model}\n"
+            )
+            
+            if entry.tokens_used:
+                log_content += f"TOKENS USED: {entry.tokens_used}\n"
+            if entry.cost_estimate:
+                log_content += f"ESTIMATED COST: ${entry.cost_estimate:.4f}\n"
+            if entry.duration_ms:
+                log_content += f"DURATION: {entry.duration_ms}ms\n"
+            
+            log_content += (
+                f"{'-'*80}\n"
+                f"RESPONSE:\n{entry.response}\n"
+                f"{'='*80}\n"
+            )
+            
+            # Write to logger and flush
+            output_logger.info(log_content)
+            # Force flush all handlers
+            for handler in output_logger.handlers:
+                try:
+                    handler.flush()
+                except Exception as flush_error:
+                    self.logger.warning(f"Failed to flush handler: {flush_error}")
+            
+        except Exception as e:
+            self.logger.error(f"Error logging output: {e}", exc_info=True)
+    
     def _log_completion_details(self, entry: ChatLogEntry, agent_name: Optional[str] = None):
-        """Log detailed completion information."""
+        """Log summary completion information to main log."""
         try:
             # Basic completion log
             agent_info = f" [{agent_name}]" if agent_name else ""
-            self.logger.info(f"OpenAI Chat Completion{agent_info}: {entry.model}")
-            
-            # Log request details
-            self.logger.debug(f"Request messages: {len(entry.messages)} messages")
-            for i, msg in enumerate(entry.messages):
-                role = msg.get('role', 'unknown')
-                content_preview = msg.get('content', '')[:100] + "..." if len(msg.get('content', '')) > 100 else msg.get('content', '')
-                self.logger.debug(f"  Message {i+1} ({role}): {content_preview}")
-            
-            # Log response details
-            response_preview = entry.response[:200] + "..." if len(entry.response) > 200 else entry.response
-            self.logger.debug(f"Response: {response_preview}")
+            session_info = f" [Session: {entry.session_id}]" if entry.session_id else ""
+            self.logger.info(f"OpenAI Chat Completion{agent_info}{session_info}: {entry.model}")
             
             # Log usage and cost information
             if entry.tokens_used:

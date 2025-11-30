@@ -10,6 +10,12 @@ from dataclasses import dataclass
 from datetime import datetime
 import json
 
+# Import session manager
+try:
+    from ..utils.session_manager import set_session_context
+except ImportError:
+    from utils.session_manager import set_session_context
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -115,6 +121,11 @@ class BaseAgent(ABC):
             company_name = state.get("company_name", "")
             sector = state.get("sector", "")
             context = state.get("context", {})
+            
+            # Set session context for this agent
+            set_session_context('agent_name', self.agent_id)
+            if stock_symbol:
+                set_session_context('stock_symbol', stock_symbol)
             
             # Execute the task using the existing method
             agent_state = await self.execute_task(

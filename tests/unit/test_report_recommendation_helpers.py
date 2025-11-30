@@ -440,3 +440,4 @@ class TestCreateRiskFactorsSection:
         assert "Sector Risks" in section.content
         assert "Default sector risks" in section.content
 
+

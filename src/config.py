@@ -36,6 +36,21 @@ class Config:
     MAX_REQUESTS_PER_MINUTE = 60
     REQUEST_DELAY = 1.0  # seconds
     
+    # API Rate Limiting
+    API_RATE_LIMIT_PER_MINUTE = int(os.getenv("API_RATE_LIMIT_PER_MINUTE", "2"))  # Default: 2 requests per minute
+    
+    # Circuit Breaker Configuration
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD = int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "3"))  # Default: 3 failures
+    CIRCUIT_BREAKER_TIME_WINDOW_SECONDS = int(os.getenv("CIRCUIT_BREAKER_TIME_WINDOW_SECONDS", "120"))  # Default: 2 minutes (120 seconds)
+    CIRCUIT_BREAKER_RECOVERY_TIMEOUT_SECONDS = int(os.getenv("CIRCUIT_BREAKER_RECOVERY_TIMEOUT_SECONDS", "60"))  # Default: 1 minute recovery timeout
+    
+    # Logging Configuration
+    COMBINE_PROMPTS_AND_OUTPUTS = os.getenv("COMBINE_PROMPTS_AND_OUTPUTS", "true").lower() == "true"  # Default: enabled
+    
+    # Metrics Configuration
+    ENABLE_METRICS = os.getenv("ENABLE_METRICS", "false").lower() == "true"  # Default: disabled
+    METRICS_PORT = int(os.getenv("METRICS_PORT", "8000"))  # Port for Prometheus metrics endpoint
+    
     @classmethod
     def validate_config(cls) -> Dict[str, bool]:
         """Validate that all required configuration is present."""
