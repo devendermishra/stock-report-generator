@@ -8,12 +8,10 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 try:
-    # Try relative imports first (when run as module)
     from .base_agent import BaseAgent, AgentState
     from ..tools.stock_data_tool import get_stock_metrics
     from ..tools.technical_analysis_formatter import TechnicalAnalysisFormatter
 except ImportError:
-    # Fall back to absolute imports (when run as script)
     from agents.base_agent import BaseAgent, AgentState
     from tools.stock_data_tool import get_stock_metrics
     from tools.technical_analysis_formatter import TechnicalAnalysisFormatter

@@ -10,18 +10,13 @@ import time
 from typing import Dict, Any, List, Optional
 from openai import OpenAI, AsyncOpenAI
 
-# Import session manager and logger
 try:
     from ..utils.session_manager import get_session_id, get_session_context
     from ..tools.openai_logger import openai_logger
+    from ..utils.metrics import record_llm_request_from_response
 except ImportError:
     from utils.session_manager import get_session_id, get_session_context
     from tools.openai_logger import openai_logger
-
-# Import metrics
-try:
-    from ..utils.metrics import record_llm_request_from_response
-except ImportError:
     try:
         from utils.metrics import record_llm_request_from_response
     except ImportError:
@@ -38,16 +33,11 @@ try:
     )
     GUARDRAILS_AVAILABLE = True
 except ImportError:
-    try:
-        from guardrails import (
-            initialize_guardrails,
-            get_guardrails,
-            GuardrailResult
-        )
-        GUARDRAILS_AVAILABLE = True
-    except ImportError:
-        GUARDRAILS_AVAILABLE = False
-        logger.warning("Guardrails module not available")
+    GUARDRAILS_AVAILABLE = False
+    initialize_guardrails = None
+    get_guardrails = None
+    GuardrailResult = None
+    logger.warning("Guardrails module not available")
 
 
 class LLMGuardrailsWrapper:

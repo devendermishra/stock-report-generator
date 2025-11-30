@@ -12,9 +12,12 @@ import re
 
 try:
     from ..config import Config
+    from ..tools.openai_call_wrapper import logged_async_chat_completion
+    from ..tools.technical_analysis_formatter import format_technical_analysis
 except ImportError:
     from config import Config
-
+    from tools.openai_call_wrapper import logged_async_chat_completion
+    from tools.technical_analysis_formatter import format_technical_analysis
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -255,11 +258,6 @@ Output format:
 }}"""
         
         # Use logged wrapper for prompt logging
-        try:
-            from ..tools.openai_call_wrapper import logged_async_chat_completion
-        except ImportError:
-            from tools.openai_call_wrapper import logged_async_chat_completion
-        
         messages = [
             {"role": "system", "content": "You are a financial analyst. Analyze financial health and return structured JSON."},
             {"role": "user", "content": prompt}
@@ -446,11 +444,6 @@ Respond in JSON format:
 }}"""
 
         # Call LLM with logging
-        try:
-            from ..tools.openai_call_wrapper import logged_async_chat_completion
-        except ImportError:
-            from tools.openai_call_wrapper import logged_async_chat_completion
-        
         messages = [
             {"role": "system", "content": "You are an expert financial analyst specializing in stock valuation. Always respond with valid JSON."},
             {"role": "user", "content": prompt}
@@ -739,11 +732,6 @@ Provide assessment in JSON format:
 }}"""
         
         # Use logged wrapper for prompt logging
-        try:
-            from ..tools.openai_call_wrapper import logged_async_chat_completion
-        except ImportError:
-            from tools.openai_call_wrapper import logged_async_chat_completion
-        
         messages = [
             {"role": "system", "content": "You are a management analyst. Analyze management effectiveness and return structured JSON."},
             {"role": "user", "content": prompt}
@@ -789,12 +777,8 @@ def perform_technical_analysis(stock_metrics: Dict[str, Any]) -> Dict[str, Any]:
         # Calculate technical indicators
         technical_indicators = calculate_technical_indicators(stock_metrics)
         
-        # Import here to avoid circular imports
+        # Format technical analysis
         try:
-            try:
-                from ..tools.technical_analysis_formatter import format_technical_analysis
-            except ImportError:
-                from tools.technical_analysis_formatter import format_technical_analysis
             technical_summary = format_technical_analysis.invoke({"technical_data": technical_indicators})
         except:
             technical_summary = "Technical analysis completed"

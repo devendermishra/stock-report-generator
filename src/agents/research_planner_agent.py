@@ -10,14 +10,13 @@ from datetime import datetime
 import json
 
 try:
-    # Try relative imports first (when run as module)
     from .base_agent import BaseAgent, AgentState
     from ..config import Config
+    from ..tools.openai_call_wrapper import logged_async_chat_completion
 except ImportError:
-    # Fall back to absolute imports (when run as script)
     from agents.base_agent import BaseAgent, AgentState
     from config import Config
-
+    from tools.openai_call_wrapper import logged_async_chat_completion
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -165,11 +164,6 @@ class ResearchPlannerAgent(BaseAgent):
             )
             
             # Call OpenAI for planning with logging
-            try:
-                from ..tools.openai_call_wrapper import logged_async_chat_completion
-            except ImportError:
-                from tools.openai_call_wrapper import logged_async_chat_completion
-            
             response = await logged_async_chat_completion(
                 client=self.openai_client,
                 model=Config.DEFAULT_MODEL,

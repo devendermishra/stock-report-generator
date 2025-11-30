@@ -10,16 +10,11 @@ import logging
 from typing import Dict, Any, List, Optional
 from openai import OpenAI, AsyncOpenAI
 
-# Import logger
 try:
     from .openai_logger import openai_logger
-except ImportError:
-    from tools.openai_logger import openai_logger
-
-# Import metrics
-try:
     from ..utils.metrics import record_llm_request_from_response
 except ImportError:
+    from tools.openai_logger import openai_logger
     try:
         from utils.metrics import record_llm_request_from_response
     except ImportError:

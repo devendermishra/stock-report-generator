@@ -12,11 +12,12 @@ from contextvars import copy_context
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-# Import session manager
 try:
     from ..utils.session_manager import get_session_id, get_session_context
+    from ..config import Config
 except ImportError:
     from utils.session_manager import get_session_id, get_session_context
+    from config import Config
 
 
 class MDCFilter(logging.Filter):
@@ -195,14 +196,9 @@ def get_prompt_logger():
         # Re-setup logging if handlers are missing
         # Get config value for combining logs
         try:
-            from ..config import Config
             combine_logs = Config.COMBINE_PROMPTS_AND_OUTPUTS
-        except ImportError:
-            try:
-                from config import Config
-                combine_logs = Config.COMBINE_PROMPTS_AND_OUTPUTS
-            except ImportError:
-                combine_logs = True  # Default to enabled
+        except (AttributeError, NameError):
+            combine_logs = True  # Default to enabled
         setup_logging(combine_prompts_and_outputs=combine_logs)
     return logger
 
@@ -220,14 +216,9 @@ def get_output_logger():
         # Re-setup logging if handlers are missing
         # Get config value for combining logs
         try:
-            from ..config import Config
             combine_logs = Config.COMBINE_PROMPTS_AND_OUTPUTS
-        except ImportError:
-            try:
-                from config import Config
-                combine_logs = Config.COMBINE_PROMPTS_AND_OUTPUTS
-            except ImportError:
-                combine_logs = True  # Default to enabled
+        except (AttributeError, NameError):
+            combine_logs = True  # Default to enabled
         setup_logging(combine_prompts_and_outputs=combine_logs)
     return logger
 
