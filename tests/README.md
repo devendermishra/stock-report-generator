@@ -10,7 +10,8 @@ tests/
 │   ├── test_summarizer_parsers.py      # Tests for JSON parsing utilities
 │   ├── test_summarizer_prompts.py      # Tests for prompt building utilities
 │   └── test_report_formatter_utils.py  # Tests for report formatting utilities
-├── integration/       # Integration tests (to be added)
+├── integration/       # Integration tests for end-to-end workflows
+│   └── test_full_workflow.py  # Full workflow integration tests
 ├── fixtures/          # Test fixtures and mock data
 ├── conftest.py        # Pytest configuration
 └── __init__.py
@@ -26,6 +27,16 @@ pytest tests/
 ### Run specific test file
 ```bash
 pytest tests/unit/test_summarizer_parsers.py
+```
+
+### Run only integration tests
+```bash
+pytest tests/integration/
+```
+
+### Run only unit tests
+```bash
+pytest tests/unit/
 ```
 
 ### Run with verbose output
@@ -58,13 +69,30 @@ Currently, the following utilities are covered by tests:
    - Risk list formatting
    - Scoring functions (sector outlook, financial performance, management quality)
 
+4. **Integration Tests** (`test_full_workflow.py`)
+   - End-to-end workflow testing
+   - AI mode workflow validation
+   - Structured mode workflow validation
+   - Error handling and edge cases
+   - Symbol validation and normalization
+   - Auto-population of company information
+
 ## Adding New Tests
 
-When adding new utility functions, create corresponding test files following the naming convention:
+When adding new tests, follow the naming convention:
 - `test_<module_name>.py` for unit tests
-- Place in `tests/unit/` directory
+- `test_<feature>_<workflow>.py` for integration tests
+- Place unit tests in `tests/unit/` directory
+- Place integration tests in `tests/integration/` directory
 
-Test classes should be named `Test<FunctionName>` and test methods should be named `test_<scenario>`.
+Test classes should be named `Test<FunctionName>` or `Test<FeatureName>` and test methods should be named `test_<scenario>`.
+
+**Integration Test Guidelines:**
+- Mock external API calls (OpenAI, yfinance, etc.)
+- Test complete workflows end-to-end
+- Verify data flow between components
+- Test both success and error scenarios
+- Use fixtures for reusable test data
 
 ## Requirements
 

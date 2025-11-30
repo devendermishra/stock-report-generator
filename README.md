@@ -452,7 +452,7 @@ python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
 ### Docker with GPU Support
 ```bash
 # Build GPU-enabled image
-docker build -f Dockerfile.gpu -t stock-report-generator:gpu .
+docker build -f docker/Dockerfile.gpu -t stock-report-generator:gpu .
 
 # Run with GPU support
 docker run --gpus all -it stock-report-generator:gpu

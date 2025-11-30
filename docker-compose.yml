@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   stock-report-generator:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     container_name: stock-report-generator
     volumes:
       - ./reports:/app/reports

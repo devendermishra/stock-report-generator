@@ -70,7 +70,7 @@ sudo systemctl restart docker
 
 ```bash
 # Use the GPU-enabled Dockerfile
-docker build -f Dockerfile.gpu -t stock-report-generator:gpu .
+docker build -f docker/Dockerfile.gpu -t stock-report-generator:gpu .
 
 # Run with GPU support
 docker run --gpus all -it stock-report-generator:gpu
