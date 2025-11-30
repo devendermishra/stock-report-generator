@@ -36,6 +36,8 @@ try:
     from ..tools.web_search_tool import search_company_news, search_market_trends
     from ..tools.technical_analysis_formatter import format_technical_analysis
     from ..config import Config
+    from ..utils.metrics import record_llm_request
+    from ..tools.openai_logger import openai_logger
 except ImportError:
     from agents.base_agent import BaseAgent, AgentState
     from agents.ai_analysis_helpers import (
@@ -47,7 +49,8 @@ except ImportError:
     from tools.web_search_tool import search_company_news, search_market_trends
     from tools.technical_analysis_formatter import format_technical_analysis
     from config import Config
-
+    from utils.metrics import record_llm_request
+    from tools.openai_logger import openai_logger
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -369,7 +372,6 @@ CRITICAL RULES:
                 
                 # Record metrics for LangChain LLM call
                 try:
-                    from ..utils.metrics import record_llm_request
                     # Try to extract usage info from response if available
                     request_tokens = None
                     response_tokens = None
@@ -392,7 +394,6 @@ CRITICAL RULES:
                 
                 # Log prompt and response
                 try:
-                    from ..tools.openai_logger import openai_logger
                     response_content = response.content if hasattr(response, 'content') else str(response)
                     openai_logger.log_chat_completion(
                         model=Config.DEFAULT_MODEL,
@@ -532,7 +533,6 @@ CRITICAL RULES:
             except Exception as e:
                 # Record failed LLM request metrics if this was an LLM call failure
                 try:
-                    from ..utils.metrics import record_llm_request
                     if 'llm_start_time' in locals():
                         llm_duration = time.time() - llm_start_time
                         record_llm_request(

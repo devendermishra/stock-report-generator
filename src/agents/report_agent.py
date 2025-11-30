@@ -11,20 +11,19 @@ import json
 import re
 
 try:
-    # Try relative imports first (when run as module)
     from .base_agent import BaseAgent, AgentState
     from ..tools.pdf_generator_tool import PDFGeneratorTool
     from ..tools.report_formatter_tool import ReportFormatterTool
     from ..tools.summarizer_tool import SummarizerTool
     from ..config import Config
+    from ..tools.openai_call_wrapper import logged_async_chat_completion
 except ImportError:
-    # Fall back to absolute imports (when run as script)
     from agents.base_agent import BaseAgent, AgentState
     from tools.pdf_generator_tool import PDFGeneratorTool
     from tools.report_formatter_tool import ReportFormatterTool
     from tools.summarizer_tool import SummarizerTool
     from config import Config
-
+    from tools.openai_call_wrapper import logged_async_chat_completion
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -355,11 +354,6 @@ Return JSON:
 """
             
             # Use logged wrapper for prompt logging
-            try:
-                from ..tools.openai_call_wrapper import logged_async_chat_completion
-            except ImportError:
-                from tools.openai_call_wrapper import logged_async_chat_completion
-            
             messages = [
                 {
                     "role": "system",
@@ -536,11 +530,6 @@ Return JSON:
 """
             
             # Use logged wrapper for prompt logging
-            try:
-                from ..tools.openai_call_wrapper import logged_async_chat_completion
-            except ImportError:
-                from tools.openai_call_wrapper import logged_async_chat_completion
-            
             messages = [
                 {
                     "role": "system",

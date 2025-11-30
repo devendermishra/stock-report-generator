@@ -31,12 +31,16 @@ try:
     from ..tools.web_search_tool import search_sector_news, search_company_news, search_market_trends
     from ..tools.generic_web_search_tool import search_web_generic
     from ..config import Config
+    from ..utils.metrics import record_llm_request
+    from ..tools.openai_logger import openai_logger
 except ImportError:
     from agents.base_agent import BaseAgent, AgentState
     from tools.stock_data_tool import get_stock_metrics, get_company_info
     from tools.web_search_tool import search_sector_news, search_company_news, search_market_trends
     from tools.generic_web_search_tool import search_web_generic
     from config import Config
+    from utils.metrics import record_llm_request
+    from tools.openai_logger import openai_logger
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +309,6 @@ IMPORTANT:
                 
                 # Record metrics for LangChain LLM call
                 try:
-                    from ..utils.metrics import record_llm_request
                     # Try to extract usage info from response if available
                     request_tokens = None
                     response_tokens = None
@@ -328,7 +331,6 @@ IMPORTANT:
                 
                 # Log prompt and response
                 try:
-                    from ..tools.openai_logger import openai_logger
                     response_content = response.content if hasattr(response, 'content') else str(response)
                     openai_logger.log_chat_completion(
                         model=Config.DEFAULT_MODEL,
@@ -464,7 +466,6 @@ IMPORTANT:
             except Exception as e:
                 # Record failed LLM request metrics if this was an LLM call failure
                 try:
-                    from ..utils.metrics import record_llm_request
                     if 'llm_start_time' in locals():
                         llm_duration = time.time() - llm_start_time
                         record_llm_request(

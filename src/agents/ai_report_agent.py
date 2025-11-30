@@ -28,11 +28,12 @@ try:
     from .base_agent import BaseAgent, AgentState
     from ..tools.pdf_generator_tool import generate_pdf_from_markdown
     from ..config import Config
+    from ..tools.openai_call_wrapper import logged_async_chat_completion
 except ImportError:
     from agents.base_agent import BaseAgent, AgentState
     from tools.pdf_generator_tool import generate_pdf_from_markdown
     from config import Config
-
+    from tools.openai_call_wrapper import logged_async_chat_completion
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -241,11 +242,6 @@ Requirements:
 Generate the complete report now."""
             
             # Use logged wrapper for prompt logging
-            try:
-                from ..tools.openai_call_wrapper import logged_async_chat_completion
-            except ImportError:
-                from tools.openai_call_wrapper import logged_async_chat_completion
-            
             messages = [
                 {
                     "role": "system",

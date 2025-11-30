@@ -9,7 +9,6 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from dataclasses import dataclass
 
-# Import session manager and logging config
 try:
     from ..utils.session_manager import get_session_id, get_session_context
     from ..utils.logging_config import get_prompt_logger, get_output_logger
