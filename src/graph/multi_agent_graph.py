@@ -72,6 +72,7 @@ class MultiAgentState(BaseModel):
     report_results: Optional[Dict[str, Any]] = None
     final_report: Optional[str] = None
     pdf_path: Optional[str] = None
+    skip_pdf: bool = False
     errors: Annotated[List[str], reduce_errors] = []
     start_time: datetime
     end_time: Optional[datetime] = None
@@ -106,7 +107,7 @@ class MultiAgentOrchestrator:
     see docs/AGENT_SPECIALIZATION.md
     """
     
-    def __init__(self, openai_api_key: str, use_ai_research: bool = True, use_ai_analysis: bool = True):
+    def __init__(self, openai_api_key: str, use_ai_research: bool = True, use_ai_analysis: bool = True, skip_pdf: bool = False):
         """
         Initialize the multi-agent orchestrator.
         
@@ -116,10 +117,12 @@ class MultiAgentOrchestrator:
                             If False, use ResearchPlannerAgent + ResearchAgent (structured workflow)
             use_ai_analysis: If True, use AIAnalysisAgent (iterative LLM-based analysis)
                             If False, use separate Financial, Management, Technical, Valuation agents
+            skip_pdf: If True, skip PDF generation and only return markdown content
         """
         self.openai_api_key = openai_api_key
         self.use_ai_research = use_ai_research
         self.use_ai_analysis = use_ai_analysis
+        self.skip_pdf = skip_pdf
         
         # Initialize agents conditionally
         if use_ai_research:
@@ -152,10 +155,10 @@ class MultiAgentOrchestrator:
         # Initialize report agent conditionally
         if use_ai_research or use_ai_analysis:
             # Use AI Report Agent when using AI for research or analysis
-            self.report_agent = AIReportAgent("ai_report_agent", openai_api_key)
+            self.report_agent = AIReportAgent("ai_report_agent", openai_api_key, skip_pdf=skip_pdf)
         else:
             # Use traditional Report Agent for traditional workflow
-            self.report_agent = ReportAgent("report_agent", openai_api_key)
+            self.report_agent = ReportAgent("report_agent", openai_api_key, skip_pdf=skip_pdf)
         
         # Build the graph
         self.graph = self._build_graph()
@@ -277,7 +280,8 @@ class MultiAgentOrchestrator:
         self,
         stock_symbol: str,
         company_name: str,
-        sector: str
+        sector: str,
+        skip_pdf: bool = False
     ) -> Dict[str, Any]:
         """
         Run the complete multi-agent workflow.
@@ -310,6 +314,7 @@ class MultiAgentOrchestrator:
                 report_results=None,
                 final_report=None,
                 pdf_path=None,
+                skip_pdf=skip_pdf,
                 errors=[],
                 start_time=datetime.now(),
                 end_time=None
@@ -773,7 +778,8 @@ class MultiAgentOrchestrator:
                 "stock_symbol": state.stock_symbol,
                 "company_name": state.company_name,
                 "sector": state.sector,
-                "context": context
+                "context": context,
+                "skip_pdf": state.skip_pdf
             }
             
             # Execute report agent using partial state update method

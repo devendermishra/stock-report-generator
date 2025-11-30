@@ -52,14 +52,16 @@ class AIReportAgent(BaseAgent):
     Content generation is AI-driven; PDF generation is tool-based.
     """
     
-    def __init__(self, agent_id: str, openai_api_key: str):
+    def __init__(self, agent_id: str, openai_api_key: str, skip_pdf: bool = False):
         """
         Initialize the AI Report Agent.
         
         Args:
             agent_id: Unique identifier for the agent
             openai_api_key: OpenAI API key for LLM calls
+            skip_pdf: If True, skip PDF generation and only return markdown content
         """
+        self.skip_pdf = skip_pdf
         # Define available tools (only PDF generation - content generation is AI-driven)
         available_tools = [
             generate_pdf_from_markdown
@@ -152,13 +154,18 @@ class AIReportAgent(BaseAgent):
                 stock_symbol, company_name, sector, research_data, analysis_data
             )
             
-            # Generate PDF using tool (non-AI, Python-based)
-            pdf_result = generate_pdf_from_markdown.invoke({
-                "markdown_content": final_report,
-                "stock_symbol": stock_symbol
-            })
-            
-            pdf_path = pdf_result.get("pdf_path", "") if isinstance(pdf_result, dict) else ""
+            # Generate PDF using tool (non-AI, Python-based) unless skip_pdf is True
+            pdf_path = ""
+            if not self.skip_pdf:
+                pdf_result = generate_pdf_from_markdown.invoke({
+                    "markdown_content": final_report,
+                    "stock_symbol": stock_symbol
+                })
+                
+                pdf_path = pdf_result.get("pdf_path", "") if isinstance(pdf_result, dict) else ""
+                state.tools_used = ["generate_pdf_from_markdown"]
+            else:
+                self.logger.info("Skipping PDF generation as requested")
             
             # Process results
             state.results = {
@@ -170,11 +177,9 @@ class AIReportAgent(BaseAgent):
                     "company_name": company_name,
                     "sector": sector,
                     "content_generation": "AI-driven",
-                    "pdf_generation": "Tool-based"
+                    "pdf_generation": "Skipped" if self.skip_pdf else "Tool-based"
                 }
             }
-            
-            state.tools_used = ["generate_pdf_from_markdown"]
             state.confidence_score = 0.9
             
             state.end_time = datetime.now()
@@ -235,20 +240,30 @@ Requirements:
 
 Generate the complete report now."""
             
-            response = await self.openai_client.chat.completions.create(
+            # Use logged wrapper for prompt logging
+            try:
+                from ..tools.openai_call_wrapper import logged_async_chat_completion
+            except ImportError:
+                from tools.openai_call_wrapper import logged_async_chat_completion
+            
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a professional financial analyst specializing in Indian stock markets. Generate comprehensive, well-structured, data-driven stock research reports in markdown format. Always base your analysis on the provided data."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            
+            response = await logged_async_chat_completion(
+                client=self.openai_client,
                 model=Config.DEFAULT_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a professional financial analyst specializing in Indian stock markets. Generate comprehensive, well-structured, data-driven stock research reports in markdown format. Always base your analysis on the provided data."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+                messages=messages,
                 temperature=0.3,
-                max_tokens=4000
+                max_tokens=4000,
+                agent_name="AIReportAgent"
             )
             
             generated_report = response.choices[0].message.content

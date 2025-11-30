@@ -11,6 +11,7 @@ import logging
 import sys
 import os
 import argparse
+import time
 from typing import Dict, Any, Optional
 
 # Add src to path
@@ -29,14 +30,26 @@ except ImportError:
     from tools.stock_data_tool import validate_symbol as tool_validate_symbol
     from tools.stock_data_tool import get_company_info as tool_get_company_info
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('stock_report_generator.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+# Import enhanced logging and session management
+try:
+    from .utils.logging_config import setup_logging
+    from .utils.session_manager import SessionContext, set_session_context
+except ImportError:
+    from utils.logging_config import setup_logging
+    from utils.session_manager import SessionContext, set_session_context
+
+# Configure enhanced logging with MDC support
+# Use Config to determine if prompts and outputs should be combined
+try:
+    from .config import Config
+except ImportError:
+    from config import Config
+
+setup_logging(
+    log_dir="logs", 
+    log_level="INFO", 
+    include_session_id=True,
+    combine_prompts_and_outputs=Config.COMBINE_PROMPTS_AND_OUTPUTS
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +64,7 @@ class StockReportGenerator:
     3. ReportAgent - Synthesizes all data into comprehensive reports
     """
     
-    def __init__(self, openai_api_key: Optional[str] = None, use_ai_research: bool = True, use_ai_analysis: bool = True):
+    def __init__(self, openai_api_key: Optional[str] = None, use_ai_research: bool = True, use_ai_analysis: bool = True, skip_pdf: bool = False):
         """
         Initialize the Stock Report Generator.
         
@@ -61,10 +74,12 @@ class StockReportGenerator:
                             If False, use ResearchPlannerAgent + ResearchAgent (structured workflow).
             use_ai_analysis: If True, use AIAnalysisAgent (iterative LLM-based comprehensive analysis).
                            If False, use separate Financial, Management, Technical, Valuation agents.
+            skip_pdf: If True, skip PDF generation and only return markdown content.
         """
         self.openai_api_key = openai_api_key or Config.OPENAI_API_KEY
         self.use_ai_research = use_ai_research
         self.use_ai_analysis = use_ai_analysis
+        self.skip_pdf = skip_pdf
         
         if not self.openai_api_key:
             raise ValueError("OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it directly.")
@@ -73,7 +88,8 @@ class StockReportGenerator:
         self.orchestrator = MultiAgentOrchestrator(
             self.openai_api_key, 
             use_ai_research=use_ai_research,
-            use_ai_analysis=use_ai_analysis
+            use_ai_analysis=use_ai_analysis,
+            skip_pdf=skip_pdf
         )
         
         research_mode = "AI Research Agent" if use_ai_research else "Research Planner + Research Agent"
@@ -97,55 +113,110 @@ class StockReportGenerator:
         Returns:
             Dictionary containing the generated report and metadata
         """
+        # Import metrics for report generation tracking
         try:
-            logger.info(f"Starting report generation for {stock_symbol}")
-            
-            # Validate inputs
-            if not stock_symbol:
-                raise ValueError("Stock symbol is required")
-            
-            # Clean stock symbol (remove .NS suffix if present)
-            if stock_symbol.endswith('.NS'):
-                stock_symbol = stock_symbol[:-3]
-            
-            # Validate symbol against NSE via tool
-            validation = tool_validate_symbol.invoke({"symbol": stock_symbol})
-            if not validation or not validation.get("valid", False):
-                raise ValueError(validation.get("error", "Symbol not found on NSE"))
-            # Fetch company info from tool to populate missing fields
-            info = tool_get_company_info.invoke({"symbol": stock_symbol}) or {}
-            if not company_name:
-                company_name = info.get("company_name") or info.get("short_name") or validation.get("company_name") or f"Company {stock_symbol}"
-            if not sector:
-                sector = info.get("sector") or validation.get("sector") or "Unknown"
-            
-            # Run the multi-agent workflow
-            results = await self.orchestrator.run_workflow(
-                stock_symbol=stock_symbol,
-                company_name=company_name,
-                sector=sector
-            )
-            
-            # Log results
-            if results["workflow_status"] == "completed":
-                logger.info(f"Successfully generated report for {stock_symbol}")
-                if results.get("pdf_path"):
-                    logger.info(f"PDF report saved to: {results['pdf_path']}")
-            else:
-                logger.warning(f"Report generation completed with errors for {stock_symbol}")
-                if results.get("errors"):
-                    logger.warning(f"Errors: {results['errors']}")
-            
-            return results
-            
-        except Exception as e:
-            logger.error(f"Report generation failed for {stock_symbol}: {e}")
-            return {
-                "stock_symbol": stock_symbol,
-                "workflow_status": "failed",
-                "error": str(e),
-                "errors": [str(e)]
-            }
+            from .utils.metrics import record_report_generation
+        except ImportError:
+            try:
+                from utils.metrics import record_report_generation
+            except ImportError:
+                record_report_generation = None
+        
+        # Record start time for report generation metrics
+        report_start_time = time.time()
+        
+        # Create session context for this invocation
+        with SessionContext() as session_id:
+            try:
+                # Set session context with stock symbol
+                set_session_context('stock_symbol', stock_symbol)
+                
+                logger.info(f"Starting report generation for {stock_symbol} [Session: {session_id}]")
+                
+                # Validate inputs
+                if not stock_symbol:
+                    raise ValueError("Stock symbol is required")
+                
+                # Clean stock symbol (remove .NS suffix if present)
+                if stock_symbol.endswith('.NS'):
+                    stock_symbol = stock_symbol[:-3]
+                
+                # Validate symbol against NSE via tool
+                validation = tool_validate_symbol.invoke({"symbol": stock_symbol})
+                if not validation or not validation.get("valid", False):
+                    raise ValueError(validation.get("error", "Symbol not found on NSE"))
+                # Fetch company info from tool to populate missing fields
+                info = tool_get_company_info.invoke({"symbol": stock_symbol}) or {}
+                if not company_name:
+                    company_name = info.get("company_name") or info.get("short_name") or validation.get("company_name") or f"Company {stock_symbol}"
+                if not sector:
+                    sector = info.get("sector") or validation.get("sector") or "Unknown"
+                
+                # Update session context
+                set_session_context('company_name', company_name)
+                set_session_context('sector', sector)
+                
+                # Run the multi-agent workflow
+                results = await self.orchestrator.run_workflow(
+                    stock_symbol=stock_symbol,
+                    company_name=company_name,
+                    sector=sector,
+                    skip_pdf=self.skip_pdf
+                )
+                
+                # Add session ID to results
+                results['session_id'] = session_id
+                
+                # Calculate report generation duration
+                report_duration = time.time() - report_start_time
+                
+                # Record report generation metrics
+                if record_report_generation:
+                    try:
+                        status = "completed" if results["workflow_status"] == "completed" else "failed"
+                        record_report_generation(
+                            stock_symbol=stock_symbol,
+                            duration_seconds=report_duration,
+                            status=status
+                        )
+                    except Exception as metrics_error:
+                        logger.warning(f"Failed to record report generation metrics: {metrics_error}")
+                
+                # Log results
+                if results["workflow_status"] == "completed":
+                    logger.info(f"Successfully generated report for {stock_symbol} [Session: {session_id}]")
+                    if results.get("pdf_path"):
+                        logger.info(f"PDF report saved to: {results['pdf_path']}")
+                else:
+                    logger.warning(f"Report generation completed with errors for {stock_symbol} [Session: {session_id}]")
+                    if results.get("errors"):
+                        logger.warning(f"Errors: {results['errors']}")
+                
+                return results
+                
+            except Exception as e:
+                # Calculate report generation duration even on failure
+                report_duration = time.time() - report_start_time
+                
+                # Record failed report generation metrics
+                if record_report_generation:
+                    try:
+                        record_report_generation(
+                            stock_symbol=stock_symbol,
+                            duration_seconds=report_duration,
+                            status="failed"
+                        )
+                    except Exception as metrics_error:
+                        logger.warning(f"Failed to record report generation metrics: {metrics_error}")
+                
+                logger.error(f"Report generation failed for {stock_symbol} [Session: {session_id}]: {e}")
+                return {
+                    "stock_symbol": stock_symbol,
+                    "session_id": session_id,
+                    "workflow_status": "failed",
+                    "error": str(e),
+                    "errors": [str(e)]
+                }
     
     def generate_report_sync(
         self,
@@ -248,6 +319,7 @@ Examples:
   python main.py RELIANCE --export-graph graph.png
   python main.py RELIANCE --skip-ai
   python main.py RELIANCE -s
+  python main.py RELIANCE --skip-pdf
   python main.py --export-graph-only graph.png
             """
         )
@@ -260,6 +332,8 @@ Examples:
                           help='Only export the graph diagram without generating a report (specify output path)')
         parser.add_argument('--skip-ai', '-s', dest='skip_ai', action='store_true',
                           help='Skip AI agents and use ResearchPlannerAgent + ResearchAgent (structured workflow) instead of AIResearchAgent and AIAnalysisAgent')
+        parser.add_argument('--skip-pdf', dest='skip_pdf', action='store_true',
+                          help='Skip PDF generation and output the full Markdown content instead')
         
         args = parser.parse_args()
         
@@ -273,10 +347,11 @@ Examples:
         use_ai_research = not args.skip_ai
         use_ai_analysis = not args.skip_ai
         
-        # Initialize the generator with AI flags
+        # Initialize the generator with AI flags and skip_pdf flag
         generator = StockReportGenerator(
             use_ai_research=use_ai_research,
-            use_ai_analysis=use_ai_analysis
+            use_ai_analysis=use_ai_analysis,
+            skip_pdf=args.skip_pdf
         )
         
         # Log which mode is being used
@@ -327,14 +402,23 @@ Examples:
             print(f"🏢 Sector: {results.get('sector', 'N/A')}")
             print(f"⏱️  Duration: {results.get('duration_seconds', 0):.2f} seconds")
             
-            if results.get("pdf_path"):
-                print(f"📄 PDF Report: {results['pdf_path']}")
-            
-            if results.get("final_report"):
-                print("\n📋 Report Preview (first 500 characters):")
-                print("-" * 40)
-                print(results["final_report"][:500] + "..." if len(results["final_report"]) > 500 else results["final_report"])
-                print("-" * 40)
+            if args.skip_pdf:
+                # Output full markdown content when --skip-pdf is used
+                if results.get("final_report"):
+                    print("\n📋 Full Markdown Report:")
+                    print("=" * 60)
+                    print(results["final_report"])
+                    print("=" * 60)
+            else:
+                # Normal mode: show PDF path and preview
+                if results.get("pdf_path"):
+                    print(f"📄 PDF Report: {results['pdf_path']}")
+                
+                if results.get("final_report"):
+                    print("\n📋 Report Preview (first 500 characters):")
+                    print("-" * 40)
+                    print(results["final_report"][:500] + "..." if len(results["final_report"]) > 500 else results["final_report"])
+                    print("-" * 40)
             
         else:
             print(f"❌ Report generation failed for {stock_symbol}")

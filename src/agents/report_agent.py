@@ -40,14 +40,16 @@ class ReportAgent(BaseAgent):
     - Ensure report quality and consistency
     """
     
-    def __init__(self, agent_id: str, openai_api_key: str):
+    def __init__(self, agent_id: str, openai_api_key: str, skip_pdf: bool = False):
         """
         Initialize the Report Agent.
         
         Args:
             agent_id: Unique identifier for the agent
             openai_api_key: OpenAI API key for LLM calls
+            skip_pdf: If True, skip PDF generation and only return markdown content
         """
+        self.skip_pdf = skip_pdf
         # Define available tools
         available_tools = [
             PDFGeneratorTool(),
@@ -144,8 +146,12 @@ class ReportAgent(BaseAgent):
             # Generate final report (pass sector to ensure it's available in report)
             final_report = await self._generate_final_report(stock_symbol, company_name, sector, report_sections)
             
-            # Generate PDF
-            pdf_path = await self._generate_pdf_report(stock_symbol, company_name, final_report)
+            # Generate PDF unless skip_pdf is True
+            pdf_path = ""
+            if not self.skip_pdf:
+                pdf_path = await self._generate_pdf_report(stock_symbol, company_name, final_report)
+            else:
+                self.logger.info("Skipping PDF generation as requested")
             
             # Compile results
             state.results = {
@@ -157,7 +163,8 @@ class ReportAgent(BaseAgent):
                     "stock_symbol": stock_symbol,
                     "company_name": company_name,
                     "sector": sector,
-                    "sections_count": len([s for s in report_sections.values() if s])
+                    "sections_count": len([s for s in report_sections.values() if s]),
+                    "pdf_generation": "Skipped" if self.skip_pdf else "Completed"
                 }
             }
             
@@ -347,20 +354,30 @@ Return JSON:
 }}
 """
             
-            response = await self.openai_client.chat.completions.create(
+            # Use logged wrapper for prompt logging
+            try:
+                from ..tools.openai_call_wrapper import logged_async_chat_completion
+            except ImportError:
+                from tools.openai_call_wrapper import logged_async_chat_completion
+            
+            messages = [
+                {
+                    "role": "system",
+                    "content": f"You are a financial sector analyst specializing in Indian stock markets. You analyze sector data and provide comprehensive outlook reports. Focus exclusively on the specified sector and do not confuse it with other sectors."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            
+            response = await logged_async_chat_completion(
+                client=self.openai_client,
                 model=Config.DEFAULT_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are a financial sector analyst specializing in Indian stock markets. You analyze sector data and provide comprehensive outlook reports. Focus exclusively on the specified sector and do not confuse it with other sectors."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+                messages=messages,
                 temperature=0.2,  # Lower temperature for more focused output
-                max_tokens=1000
+                max_tokens=1000,
+                agent_name="ReportAgent"
             )
             
             # Parse response
@@ -518,20 +535,30 @@ Return JSON:
 }}
 """
             
-            response = await self.openai_client.chat.completions.create(
+            # Use logged wrapper for prompt logging
+            try:
+                from ..tools.openai_call_wrapper import logged_async_chat_completion
+            except ImportError:
+                from tools.openai_call_wrapper import logged_async_chat_completion
+            
+            messages = [
+                {
+                    "role": "system",
+                    "content": f"You are a financial analyst specializing in peer comparison analysis. Compare stocks within the {peer_sector} sector and provide detailed, actionable insights. Focus on relative valuation, competitive positioning, and investment implications."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            
+            response = await logged_async_chat_completion(
+                client=self.openai_client,
                 model=Config.DEFAULT_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are a financial analyst specializing in peer comparison analysis. Compare stocks within the {peer_sector} sector and provide detailed, actionable insights. Focus on relative valuation, competitive positioning, and investment implications."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+                messages=messages,
                 temperature=0.2,  # Lower temperature for more focused analysis
-                max_tokens=1200
+                max_tokens=1200,
+                agent_name="ReportAgent"
             )
             
             # Parse response

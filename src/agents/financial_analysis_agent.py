@@ -244,20 +244,30 @@ Output format:
 }}
 """
             
-            response = await self.openai_client.chat.completions.create(
+            # Use logged wrapper for prompt logging
+            try:
+                from ..tools.openai_call_wrapper import logged_async_chat_completion
+            except ImportError:
+                from tools.openai_call_wrapper import logged_async_chat_completion
+            
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a financial analyst. Analyze financial health using both stock metrics and financial ratios, and return structured JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            
+            response = await logged_async_chat_completion(
+                client=self.openai_client,
                 model=Config.DEFAULT_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a financial analyst. Analyze financial health using both stock metrics and financial ratios, and return structured JSON."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+                messages=messages,
                 temperature=0.3,
-                max_tokens=500
+                max_tokens=500,
+                agent_name="FinancialAnalysisAgent"
             )
             
             # Parse response

@@ -164,8 +164,14 @@ class ResearchPlannerAgent(BaseAgent):
                 stock_symbol, company_name, sector, country, available_tools
             )
             
-            # Call OpenAI for planning
-            response = await self.openai_client.chat.completions.create(
+            # Call OpenAI for planning with logging
+            try:
+                from ..tools.openai_call_wrapper import logged_async_chat_completion
+            except ImportError:
+                from tools.openai_call_wrapper import logged_async_chat_completion
+            
+            response = await logged_async_chat_completion(
+                client=self.openai_client,
                 model=Config.DEFAULT_MODEL,
                 messages=[
                     {
@@ -178,7 +184,8 @@ class ResearchPlannerAgent(BaseAgent):
                     }
                 ],
                 temperature=0.2,
-                max_tokens=3000
+                max_tokens=3000,
+                agent_name="ResearchPlannerAgent"
             )
             
             # Parse the response

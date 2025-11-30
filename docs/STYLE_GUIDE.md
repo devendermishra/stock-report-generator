@@ -180,3 +180,4 @@ Install extensions:
 - MyPy is optional but recommended for type safety
 - Pylint provides the most comprehensive analysis but can be slower
 
+

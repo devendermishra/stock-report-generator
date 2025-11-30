@@ -254,14 +254,24 @@ Output format:
     "overall_assessment": "<brief assessment>"
 }}"""
         
-        response = await openai_client.chat.completions.create(
+        # Use logged wrapper for prompt logging
+        try:
+            from ..tools.openai_call_wrapper import logged_async_chat_completion
+        except ImportError:
+            from tools.openai_call_wrapper import logged_async_chat_completion
+        
+        messages = [
+            {"role": "system", "content": "You are a financial analyst. Analyze financial health and return structured JSON."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = await logged_async_chat_completion(
+            client=openai_client,
             model=Config.DEFAULT_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a financial analyst. Analyze financial health and return structured JSON."},
-                {"role": "user", "content": prompt}
-            ],
+            messages=messages,
             temperature=0.3,
-            max_tokens=500
+            max_tokens=500,
+            agent_name="AIAnalysisHelpers"
         )
         
         response_text = response.choices[0].message.content
@@ -435,15 +445,24 @@ Respond in JSON format:
     "reasoning": "<brief explanation>"
 }}"""
 
-        # Call LLM
-        response = await openai_client.chat.completions.create(
+        # Call LLM with logging
+        try:
+            from ..tools.openai_call_wrapper import logged_async_chat_completion
+        except ImportError:
+            from tools.openai_call_wrapper import logged_async_chat_completion
+        
+        messages = [
+            {"role": "system", "content": "You are an expert financial analyst specializing in stock valuation. Always respond with valid JSON."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = await logged_async_chat_completion(
+            client=openai_client,
             model=Config.DEFAULT_MODEL,
-            messages=[
-                {"role": "system", "content": "You are an expert financial analyst specializing in stock valuation. Always respond with valid JSON."},
-                {"role": "user", "content": prompt}
-            ],
+            messages=messages,
             temperature=0.2,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            agent_name="AIAnalysisHelpers"
         )
         
         # Parse response
@@ -719,14 +738,24 @@ Provide assessment in JSON format:
     "overall_assessment": "<brief assessment>"
 }}"""
         
-        response = await openai_client.chat.completions.create(
+        # Use logged wrapper for prompt logging
+        try:
+            from ..tools.openai_call_wrapper import logged_async_chat_completion
+        except ImportError:
+            from tools.openai_call_wrapper import logged_async_chat_completion
+        
+        messages = [
+            {"role": "system", "content": "You are a management analyst. Analyze management effectiveness and return structured JSON."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = await logged_async_chat_completion(
+            client=openai_client,
             model=Config.DEFAULT_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a management analyst. Analyze management effectiveness and return structured JSON."},
-                {"role": "user", "content": prompt}
-            ],
+            messages=messages,
             temperature=0.3,
-            max_tokens=500
+            max_tokens=500,
+            agent_name="AIAnalysisHelpers"
         )
         
         response_text = response.choices[0].message.content
