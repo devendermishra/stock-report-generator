@@ -16,7 +16,24 @@ def create_executive_summary_section(
     get_recommendation_summary,
     get_management_outlook_summary
 ) -> ReportSection:
-    """Create executive summary section."""
+    """
+    Create executive summary section for the stock report.
+    
+    Args:
+        stock_symbol: Stock symbol (e.g., 'TCS', 'RELIANCE')
+        stock_summary: Dictionary containing stock-related data including company_name,
+            current_price, market_cap, pe_ratio, and financial_metrics
+        sector_summary: Dictionary containing sector analysis data including sector,
+            performance, summary, and outlook
+        management_summary: Dictionary containing management analysis data
+        format_market_cap: Function to format market capitalization value
+        get_recommendation_summary: Function to generate investment recommendation summary
+        get_management_outlook_summary: Function to generate management outlook summary
+        
+    Returns:
+        ReportSection object containing the executive summary with title, content,
+        level, order, and metadata
+    """
     # Extract company name and sectors
     company_name = stock_summary.get('company_name', 'N/A')
     sectors = stock_summary.get('sectors', [])
@@ -81,7 +98,23 @@ def create_company_overview_section(
     sector_summary: Dict[str, Any] = None,
     format_market_cap=None
 ) -> ReportSection:
-    """Create company overview section."""
+    """
+    Create company overview section for the stock report.
+    
+    Args:
+        stock_symbol: Stock symbol (e.g., 'TCS', 'RELIANCE')
+        stock_summary: Dictionary containing stock-related data including company_name,
+            current_price, market_cap, high_52w, low_52w, pe_ratio, pb_ratio, eps,
+            dividend_yield, beta, volume, avg_volume, change_percent, and financial_metrics
+        sector_summary: Optional dictionary containing sector information. If provided,
+            used to supplement sector data from stock_summary
+        format_market_cap: Optional function to format market capitalization value.
+            If None, market cap is converted to string directly
+        
+    Returns:
+        ReportSection object containing the company overview with title, content,
+        level, order, and metadata
+    """
     # Extract company information
     company_name = stock_summary.get('company_name', 'N/A')
     sectors = stock_summary.get('sectors', [])
@@ -140,7 +173,20 @@ def create_sector_analysis_section(
     format_peer_comparison,
     format_regulatory_environment
 ) -> ReportSection:
-    """Create sector analysis section."""
+    """
+    Create sector analysis section for the stock report.
+    
+    Args:
+        sector_summary: Dictionary containing sector analysis data including summary,
+            trends, peer_comparison, and regulatory_environment
+        format_trends_list: Function to format sector trends list into readable text
+        format_peer_comparison: Function to format peer comparison data into readable text
+        format_regulatory_environment: Function to format regulatory environment information
+        
+    Returns:
+        ReportSection object containing the sector analysis with title, content,
+        level, order, and metadata
+    """
     content = f"""
 ## Sector Analysis
 
@@ -170,7 +216,20 @@ def create_financial_performance_section(
     stock_summary: Dict[str, Any],
     format_technical_analysis
 ) -> ReportSection:
-    """Create financial performance section."""
+    """
+    Create financial performance section for the stock report.
+    
+    Args:
+        stock_summary: Dictionary containing stock-related data including revenue_growth,
+            profit_growth, roe, roa, pe_ratio, pb_ratio, ev_ebitda, technical_analysis,
+            and financial_metrics
+        format_technical_analysis: Function to format technical analysis data into
+            readable text
+        
+    Returns:
+        ReportSection object containing the financial performance section with title,
+        content, level, order, and metadata
+    """
     content = f"""
 ## Financial Performance
 
@@ -201,7 +260,18 @@ def create_financial_performance_section(
 def create_management_discussion_section(
     management_summary: Dict[str, Any]
 ) -> ReportSection:
-    """Create management discussion section."""
+    """
+    Create management discussion and analysis section for the stock report.
+    
+    Args:
+        management_summary: Dictionary containing management analysis data including
+            management_outlook, summary, strategic_initiatives, growth_opportunities,
+            and risk_factors
+        
+    Returns:
+        ReportSection object containing the management discussion section with title,
+        content, level, order, and metadata
+    """
     # Get management outlook with better fallback
     management_outlook = management_summary.get('management_outlook', 
                                               management_summary.get('summary', 

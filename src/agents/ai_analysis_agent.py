@@ -99,9 +99,15 @@ class AIAnalysisAgent(BaseAgent):
         """
         Initialize the AI Analysis Agent.
         
+        Sets up the agent with LangChain LLM, tool bindings, and OpenAI client
+        for comprehensive multi-dimensional analysis.
+        
         Args:
-            agent_id: Unique identifier for the agent
-            openai_api_key: OpenAI API key for LLM calls
+            agent_id: Unique identifier for the agent instance
+            openai_api_key: OpenAI API key for LLM calls and analysis prompts
+        
+        Returns:
+            None
         """
         # Define available tools
         available_tools = [
@@ -145,14 +151,28 @@ class AIAnalysisAgent(BaseAgent):
         """
         Execute comprehensive analysis using true agent pattern with iterative tool selection.
         
+        Performs financial, management, technical, and valuation analysis by:
+        1. Extracting available data from research agent results
+        2. Using iterative LLM-based tool selection to gather additional data if needed
+        3. Performing comprehensive analysis on all gathered data
+        4. Structuring results similar to individual analysis agents
+        
         Args:
-            stock_symbol: NSE stock symbol
+            stock_symbol: NSE stock symbol (e.g., 'TCS', 'RELIANCE')
             company_name: Full company name
-            sector: Sector name
-            context: Current context from previous agents (research data)
+            sector: Sector name (e.g., 'Technology', 'Energy')
+            context: Dictionary containing context from previous agents, including
+                research_agent_results or ai_research_agent_results with company_data
+                and gathered_data
             
         Returns:
-            AgentState with comprehensive analysis results
+            AgentState object containing:
+                - results: Dictionary with financial_analysis, management_analysis,
+                  technical_analysis, valuation_analysis, gathered_data, ai_iterations,
+                  and final_summary
+                - tools_used: List of tool names executed during analysis
+                - confidence_score: Confidence score (0.0 to 1.0)
+                - errors: List of any errors encountered during execution
         """
         start_time = datetime.now()
         
@@ -312,18 +332,35 @@ CRITICAL RULES:
         pre_populated_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Execute the iterative agent loop.
+        Execute the iterative agent loop for tool selection and data gathering.
+        
+        Implements the true LangGraph agent pattern:
+        1. LLM decides which tools to call based on task and available data
+        2. Executes selected tools and gathers results
+        3. Adds tool results to message history
+        4. Repeats until LLM decides analysis is complete or max iterations reached
         
         Args:
-            task_description: Task description for the agent
-            stock_symbol: Stock symbol
-            company_name: Company name
-            sector: Sector name
-            research_data: Data from research agent
-            pre_populated_data: Data already available from research (to avoid redundant tool calls)
+            task_description: Detailed task description instructing the agent on what
+                analysis to perform and which tools are available
+            stock_symbol: NSE stock symbol (e.g., 'TCS', 'RELIANCE')
+            company_name: Full company name
+            sector: Sector name (e.g., 'Technology', 'Energy')
+            research_data: Dictionary containing data from research agent, including
+                company_data and gathered_data
+            pre_populated_data: Dictionary mapping tool names to their results that
+                are already available from research (e.g., {'get_stock_metrics': {...}}).
+                These tools will be skipped to avoid redundant API calls
             
         Returns:
-            Dictionary with gathered data, tools executed, and confidence
+            Dictionary containing:
+                - gathered_data: Dictionary mapping tool names to their results
+                - tools_executed: List of tool names that were actually executed
+                - confidence: Confidence score (0.0 to 1.0) based on tools executed
+                - iterations: List of iteration details with tool calls and results
+                - final_summary: Final summary message from the agent (if completed)
+                - errors: List of any errors encountered
+                - max_iterations_reached: Boolean indicating if max iterations was hit
         """
         if HumanMessage is None or ToolMessage is None:
             raise ImportError("langchain_core.messages is required")
