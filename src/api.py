@@ -4,8 +4,6 @@ Provides REST API endpoints for generating stock research reports.
 """
 
 import logging
-import sys
-import os
 import tempfile
 from typing import Optional
 from datetime import datetime
@@ -18,18 +16,27 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-# Import from modules (we're now inside src/, so use relative imports when run as module)
+# Import Config first to ensure .env is loaded before metrics initialization
+try:
+    # Try relative imports first (when run as python -m src.api)
+    from .config import Config
+except ImportError:
+    # Fall back to absolute imports (when PYTHONPATH includes src/)
+    from config import Config
+
+# Now import metrics (Config and .env are already loaded)
+from src.utils.metrics import initialize_metrics, get_metrics_status
+
+# Import remaining modules
 try:
     # Try relative imports first (when run as python -m src.api)
     from .main import StockReportGenerator
-    from .config import Config
     from .utils.logging_config import setup_logging
     from .utils.circuit_breaker import get_api_circuit_breaker
     from .tools.pdf_generator_tool import PDFGeneratorTool
 except ImportError:
     # Fall back to absolute imports (when PYTHONPATH includes src/)
     from main import StockReportGenerator
-    from config import Config
     from utils.logging_config import setup_logging
     from utils.circuit_breaker import get_api_circuit_breaker
     from tools.pdf_generator_tool import PDFGeneratorTool
@@ -72,6 +79,22 @@ generator_structured: Optional[StockReportGenerator] = None  # Structured workfl
 
 # Circuit breaker will be initialized lazily with Config values when first accessed
 circuit_breaker = None
+
+# Initialize Prometheus metrics if enabled
+try:
+    initialize_metrics()
+except Exception as e:
+    logger.debug(f"Metrics initialization: {e}")
+
+# Log metrics status
+try:
+    metrics_status = get_metrics_status()
+    if metrics_status.get("prometheus_enabled"):
+        logger.info("Metrics collection enabled (Prometheus available)")
+    else:
+        logger.debug("Metrics collection enabled (in-memory only)")
+except Exception as e:
+    logger.debug(f"Could not get metrics status: {e}")
 
 
 class ReportRequest(BaseModel):

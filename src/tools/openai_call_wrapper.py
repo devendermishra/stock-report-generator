@@ -12,14 +12,11 @@ from openai import OpenAI, AsyncOpenAI
 
 try:
     from .openai_logger import openai_logger
-    from ..utils.metrics import record_llm_request_from_response
+    from ..utils.metrics import record_llm_request_from_response, record_error
     from ..utils.retry import retry_llm_call, async_retry_llm_call
 except ImportError:
     from tools.openai_logger import openai_logger
-    try:
-        from utils.metrics import record_llm_request_from_response
-    except ImportError:
-        record_llm_request_from_response = None
+    from utils.metrics import record_llm_request_from_response, record_error
     try:
         from utils.retry import retry_llm_call, async_retry_llm_call
     except ImportError:
@@ -96,17 +93,16 @@ def logged_chat_completion(
             response_content = response.choices[0].message.content
         
         # Record metrics
-        if record_llm_request_from_response:
-            try:
-                record_llm_request_from_response(
-                    model=model,
-                    response=response,
-                    agent_name=agent_name,
-                    duration_seconds=duration_seconds,
-                    success=True
-                )
-            except Exception as metrics_error:
-                logger.warning(f"Failed to record metrics: {metrics_error}")
+        try:
+            record_llm_request_from_response(
+                model=model,
+                response=response,
+                agent=agent_name,
+                duration=duration_seconds,
+                success=True
+            )
+        except Exception as metrics_error:
+            logger.debug(f"Failed to record metrics: {metrics_error}")
         
         # Log the completion
         try:
@@ -125,18 +121,18 @@ def logged_chat_completion(
         
     except Exception as e:
         # Record failed request metrics
-        if record_llm_request_from_response:
-            try:
-                duration_seconds = time.time() - start_time
-                record_llm_request_from_response(
-                    model=model,
-                    response=None,
-                    agent_name=agent_name,
-                    duration_seconds=duration_seconds,
-                    success=False
-                )
-            except Exception:
-                pass  # Don't fail on metrics errors
+        try:
+            duration_seconds = time.time() - start_time
+            record_llm_request_from_response(
+                model=model,
+                response=None,
+                agent_name=agent_name,
+                duration=duration_seconds,
+                success=False
+            )
+            record_error("llm_call_failed", f"openai_call_wrapper.{type(e).__name__}")
+        except Exception:
+            pass  # Don't fail on metrics errors
         
         logger.error(f"OpenAI API call failed: {e}")
         raise
@@ -209,17 +205,16 @@ async def logged_async_chat_completion(
             response_content = response.choices[0].message.content
         
         # Record metrics
-        if record_llm_request_from_response:
-            try:
-                record_llm_request_from_response(
-                    model=model,
-                    response=response,
-                    agent_name=agent_name,
-                    duration_seconds=duration_seconds,
-                    success=True
-                )
-            except Exception as metrics_error:
-                logger.warning(f"Failed to record metrics: {metrics_error}")
+        try:
+            record_llm_request_from_response(
+                model=model,
+                response=response,
+                agent=agent_name,
+                duration=duration_seconds,
+                success=True
+            )
+        except Exception as metrics_error:
+            logger.debug(f"Failed to record metrics: {metrics_error}")
         
         # Log the completion
         try:
@@ -238,18 +233,17 @@ async def logged_async_chat_completion(
         
     except Exception as e:
         # Record failed request metrics
-        if record_llm_request_from_response:
-            try:
-                duration_seconds = time.time() - start_time
-                record_llm_request_from_response(
-                    model=model,
-                    response=None,
-                    agent_name=agent_name,
-                    duration_seconds=duration_seconds,
-                    success=False
-                )
-            except Exception:
-                pass  # Don't fail on metrics errors
+        try:
+            duration_seconds = time.time() - start_time
+            record_llm_request_from_response(
+                model=model,
+                response=None,
+                agent_name=agent_name,
+                duration_seconds=duration_seconds,
+                success=False
+            )
+        except Exception:
+            pass  # Don't fail on metrics errors
         
         logger.error(f"OpenAI async API call failed: {e}")
         raise

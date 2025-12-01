@@ -326,10 +326,10 @@ IMPORTANT:
                     
                     record_llm_request(
                         model=Config.DEFAULT_MODEL,
-                        agent_name="AIResearchAgent",
+                        agent="AIResearchAgent",
                         request_tokens=request_tokens,
                         response_tokens=response_tokens,
-                        duration_seconds=llm_duration,
+                        duration=llm_duration,
                         success=True
                     )
                 except Exception as metrics_error:
@@ -477,10 +477,10 @@ IMPORTANT:
                         llm_duration = time.time() - llm_start_time
                         record_llm_request(
                             model=Config.DEFAULT_MODEL,
-                            agent_name="AIResearchAgent",
+                            agent="AIResearchAgent",
                             request_tokens=None,
                             response_tokens=None,
-                            duration_seconds=llm_duration,
+                            duration=llm_duration,
                             success=False
                         )
                 except Exception:

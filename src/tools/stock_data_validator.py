@@ -52,7 +52,10 @@ class StockDataValidator:
             
             # Try to get basic info from yfinance with retry
             import yfinance as yf
-            from ..utils.retry import retry_tool_call
+            try:
+                from ..utils.retry import retry_tool_call
+            except ImportError:
+                from utils.retry import retry_tool_call
             
             @retry_tool_call()
             def _get_ticker():
@@ -101,7 +104,10 @@ class StockDataValidator:
         """
         try:
             import yfinance as yf
-            from ..utils.retry import retry_tool_call
+            try:
+                from ..utils.retry import retry_tool_call
+            except ImportError:
+                from utils.retry import retry_tool_call
             
             # First try yfinance with retry
             yf_symbol = f"{symbol}.NS" if not symbol.endswith('.NS') else symbol

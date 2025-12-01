@@ -1,259 +1,203 @@
 """
-Prometheus Metrics Module for Stock Report Generator.
+Simple Metrics Collection Module.
 
-Provides metrics collection for:
-- LLM token counts (request/response)
-- LLM request counts (total/success/failed)
-- LLM request duration
-- Report generation counts and duration
-
-Metrics are config-controlled and disabled by default.
+Always collects metrics in-memory. Optionally exports to Prometheus if available.
 """
 
 import logging
-import time
 from typing import Optional, Dict, Any
-from functools import wraps
-
-try:
-    from prometheus_client import Counter, Histogram, Gauge, start_http_server
-    PROMETHEUS_AVAILABLE = True
-except ImportError:
-    PROMETHEUS_AVAILABLE = False
-    logging.warning("prometheus_client not available. Metrics will be disabled.")
-
-try:
-    from ..config import Config
-except ImportError:
-    from config import Config
+from collections import defaultdict
+from threading import Lock
 
 logger = logging.getLogger(__name__)
 
-# Metrics instances (initialized only if enabled)
-_llm_token_count_request: Optional[Counter] = None
-_llm_token_count_response: Optional[Counter] = None
-_llm_requests_total: Optional[Counter] = None
-_llm_requests_success: Optional[Counter] = None
-_llm_requests_failed: Optional[Counter] = None
-_llm_request_duration: Optional[Histogram] = None
-_report_generation_count: Optional[Counter] = None
-_report_generation_duration: Optional[Histogram] = None
+# Simple in-memory storage
+_lock = Lock()
+_counts = defaultdict(int)  # metric_name -> count
+_durations = defaultdict(list)  # metric_name -> [durations]
 
-_metrics_enabled = False
-_metrics_server_started = False
+# Optional Prometheus
+_prometheus_metrics = {}
+_prometheus_enabled = False
+_init_lock = Lock()  # Lock for initialization
 
 
-def initialize_metrics():
+def initialize_prometheus_metrics():
     """Initialize Prometheus metrics if enabled in config."""
-    global _llm_token_count_request, _llm_token_count_response
-    global _llm_requests_total, _llm_requests_success, _llm_requests_failed
-    global _llm_request_duration, _report_generation_count, _report_generation_duration
-    global _metrics_enabled, _metrics_server_started
+    global _prometheus_metrics, _prometheus_enabled
     
-    if not Config.ENABLE_METRICS:
-        logger.info("Metrics are disabled in configuration")
-        return
-    
-    if not PROMETHEUS_AVAILABLE:
-        logger.warning("Prometheus client not available. Metrics will be disabled.")
-        return
-    
-    try:
-        # LLM Token Count Metrics
-        _llm_token_count_request = Counter(
-            'llm_token_count_request',
-            'Total number of tokens in LLM requests',
-            ['model', 'agent_name']
-        )
+    # Thread-safe check to prevent duplicate initialization
+    with _init_lock:
+        if _prometheus_enabled:
+            logger.debug("Prometheus metrics already initialized")
+            return
         
-        _llm_token_count_response = Counter(
-            'llm_token_count_response',
-            'Total number of tokens in LLM responses',
-            ['model', 'agent_name']
-        )
-        
-        # LLM Request Count Metrics
-        _llm_requests_total = Counter(
-            'llm_requests_total',
-            'Total number of LLM requests',
-            ['model', 'agent_name']
-        )
-        
-        _llm_requests_success = Counter(
-            'llm_requests_success',
-            'Total number of successful LLM requests',
-            ['model', 'agent_name']
-        )
-        
-        _llm_requests_failed = Counter(
-            'llm_requests_failed',
-            'Total number of failed LLM requests',
-            ['model', 'agent_name']
-        )
-        
-        # LLM Request Duration
-        _llm_request_duration = Histogram(
-            'llm_request_duration_seconds',
-            'Time taken for LLM requests in seconds',
-            ['model', 'agent_name'],
-            buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0)
-        )
-        
-        # Report Generation Metrics
-        _report_generation_count = Counter(
-            'report_generation_count',
-            'Total number of reports generated',
-            ['stock_symbol', 'status']
-        )
-        
-        _report_generation_duration = Histogram(
-            'report_generation_duration_seconds',
-            'Time taken to generate reports in seconds',
-            ['stock_symbol'],
-            buckets=(10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1800.0)
-        )
-        
-        _metrics_enabled = True
-        logger.info("Prometheus metrics initialized successfully")
-        
-        # Start metrics HTTP server if not already started
-        if not _metrics_server_started:
+        try:
+            from prometheus_client import Counter, Histogram, start_http_server
+            from ..config import Config
+        except ImportError:
             try:
-                start_http_server(Config.METRICS_PORT)
-                _metrics_server_started = True
-                logger.info(f"Prometheus metrics server started on port {Config.METRICS_PORT}")
-            except OSError as e:
-                logger.warning(f"Failed to start metrics server on port {Config.METRICS_PORT}: {e}")
-                logger.warning("Metrics will still be collected but not exposed via HTTP")
+                from config import Config
+            except ImportError:
+                logger.debug("Config not available for Prometheus initialization")
+                return
+            logger.debug("prometheus_client not available")
+            return
         
-    except Exception as e:
-        logger.error(f"Failed to initialize metrics: {e}")
-        _metrics_enabled = False
+        if not Config.ENABLE_METRICS:
+            logger.debug("Prometheus metrics disabled by configuration")
+            return
+        
+        # Initialize metrics objects first
+        try:
+            _prometheus_metrics = {
+                'llm_requests': Counter('llm_requests_total', 'Total LLM requests', ['model', 'agent']),
+                'llm_tokens': Counter('llm_tokens_total', 'Total LLM tokens', ['model', 'agent', 'type']),
+                'llm_duration': Histogram('llm_duration_seconds', 'LLM request duration', ['model', 'agent']),
+                'reports': Counter('reports_total', 'Reports generated', ['symbol', 'status']),
+                'validations': Counter('validations_total', 'Symbol validations', ['symbol', 'status']),
+                'errors': Counter('errors_total', 'Errors', ['type', 'location']),
+            }
+        except Exception as e:
+            logger.debug(f"Failed to create Prometheus metrics: {e}")
+            return
+        
+        # Try to start HTTP server
+        try:
+            start_http_server(Config.METRICS_PORT, addr='')
+            _prometheus_enabled = True
+            logger.info(f"Prometheus metrics enabled on port {Config.METRICS_PORT}")
+        except OSError as e:
+            if "Address already in use" in str(e):
+                # Port already in use - metrics are still enabled and will be collected
+                # They can be scraped from the existing server if it's serving the same registry
+                _prometheus_enabled = True
+                logger.debug(f"Prometheus port {Config.METRICS_PORT} already in use. Metrics enabled (may be served by existing process).")
+            else:
+                logger.debug(f"Failed to start Prometheus server: {e}")
+        except Exception as e:
+            logger.debug(f"Prometheus server startup failed: {e}")
 
 
-def record_llm_request(
-    model: str,
-    agent_name: Optional[str] = None,
-    request_tokens: Optional[int] = None,
-    response_tokens: Optional[int] = None,
-    duration_seconds: Optional[float] = None,
-    success: bool = True
-):
-    """
-    Record LLM request metrics.
-    
-    Args:
-        model: Model name (e.g., 'gpt-4o-mini')
-        agent_name: Name of the agent making the request (optional)
-        request_tokens: Number of tokens in the request
-        response_tokens: Number of tokens in the response
-        duration_seconds: Duration of the request in seconds
-        success: Whether the request was successful
-    """
-    if not _metrics_enabled:
-        return
-    
-    agent_label = agent_name or "unknown"
-    
-    try:
-        # Increment total requests
-        if _llm_requests_total:
-            _llm_requests_total.labels(model=model, agent_name=agent_label).inc()
-        
-        # Increment success/failed counters
-        if success:
-            if _llm_requests_success:
-                _llm_requests_success.labels(model=model, agent_name=agent_label).inc()
-        else:
-            if _llm_requests_failed:
-                _llm_requests_failed.labels(model=model, agent_name=agent_label).inc()
-        
-        # Record token counts
-        if request_tokens is not None and _llm_token_count_request:
-            _llm_token_count_request.labels(model=model, agent_name=agent_label).inc(request_tokens)
-        
-        if response_tokens is not None and _llm_token_count_response:
-            _llm_token_count_response.labels(model=model, agent_name=agent_label).inc(response_tokens)
-        
-        # Record duration
-        if duration_seconds is not None and _llm_request_duration:
-            _llm_request_duration.labels(model=model, agent_name=agent_label).observe(duration_seconds)
-            
-    except Exception as e:
-        logger.warning(f"Failed to record LLM metrics: {e}")
+def _record(name: str, value: float = 1.0, labels: Optional[Dict[str, str]] = None):
+    """Internal: record a metric."""
+    with _lock:
+        _counts[name] += value
+        if labels:
+            key = f"{name}_{'_'.join(f'{k}={v}' for k, v in sorted(labels.items()))}"
+            _counts[key] += value
+
+    # Prometheus
+    if _prometheus_enabled and name in _prometheus_metrics:
+        try:
+            if labels:
+                _prometheus_metrics[name].labels(**labels).inc(value)
+            else:
+                _prometheus_metrics[name].inc(value)
+        except Exception:
+            pass
 
 
-def record_llm_request_from_response(
-    model: str,
-    response: Any,
-    agent_name: Optional[str] = None,
-    duration_seconds: Optional[float] = None,
-    success: bool = True
-):
-    """
-    Record LLM request metrics from an OpenAI response object.
-    
-    Args:
-        model: Model name
-        response: OpenAI response object (with usage attribute)
-        agent_name: Name of the agent making the request
-        duration_seconds: Duration of the request in seconds
-        success: Whether the request was successful
-    """
+def _record_duration(name: str, seconds: float, labels: Optional[Dict[str, str]] = None):
+    """Internal: record a duration."""
+    with _lock:
+        _durations[name].append(seconds)
+        if len(_durations[name]) > 1000:
+            _durations[name] = _durations[name][-1000:]
+
+    # Prometheus
+    if _prometheus_enabled and name in _prometheus_metrics:
+        try:
+            if labels:
+                _prometheus_metrics[name].labels(**labels).observe(seconds)
+            else:
+                _prometheus_metrics[name].observe(seconds)
+        except Exception:
+            pass
+
+
+# Public API - simple functions
+def record_llm_request(model: str, agent: Optional[str] = None,
+                     request_tokens: Optional[int] = None,
+                     response_tokens: Optional[int] = None,
+                     duration: Optional[float] = None,
+                     success: bool = True):
+    """Record LLM request."""
+    labels = {"model": model, "agent": agent or "unknown"}
+    _record("llm_requests", labels=labels)
+    if not success:
+        _record("llm_errors", labels=labels)
+    if request_tokens:
+        _record("llm_tokens", value=request_tokens, labels={**labels, "type": "request"})
+    if response_tokens:
+        _record("llm_tokens", value=response_tokens, labels={**labels, "type": "response"})
+    if duration:
+        _record_duration("llm_duration", duration, labels=labels)
+
+
+def record_llm_request_from_response(model: str, response: Any,
+                                    agent: Optional[str] = None,
+                                    duration: Optional[float] = None,
+                                    success: bool = True):
+    """Record LLM request from response object."""
     request_tokens = None
     response_tokens = None
-    
-    # Extract token counts from response if available
     if hasattr(response, 'usage') and response.usage:
-        if hasattr(response.usage, 'prompt_tokens'):
-            request_tokens = response.usage.prompt_tokens
-        if hasattr(response.usage, 'completion_tokens'):
-            response_tokens = response.usage.completion_tokens
-    
-    record_llm_request(
-        model=model,
-        agent_name=agent_name,
-        request_tokens=request_tokens,
-        response_tokens=response_tokens,
-        duration_seconds=duration_seconds,
-        success=success
-    )
+        request_tokens = getattr(response.usage, 'prompt_tokens', None)
+        response_tokens = getattr(response.usage, 'completion_tokens', None)
+    record_llm_request(model, agent, request_tokens, response_tokens, duration, success)
 
 
-def record_report_generation(
-    stock_symbol: str,
-    duration_seconds: Optional[float] = None,
-    status: str = "completed"
-):
-    """
-    Record report generation metrics.
-    
-    Args:
-        stock_symbol: Stock symbol for the report
-        duration_seconds: Duration of report generation in seconds
-        status: Status of report generation ('completed', 'failed', etc.)
-    """
-    if not _metrics_enabled:
-        return
-    
-    try:
-        # Increment report count
-        if _report_generation_count:
-            _report_generation_count.labels(stock_symbol=stock_symbol, status=status).inc()
-        
-        # Record duration
-        if duration_seconds is not None and _report_generation_duration:
-            _report_generation_duration.labels(stock_symbol=stock_symbol).observe(duration_seconds)
-            
-    except Exception as e:
-        logger.warning(f"Failed to record report generation metrics: {e}")
+def record_report(symbol: str, duration: Optional[float] = None, status: str = "completed"):
+    """Record report generation."""
+    labels = {"symbol": symbol, "status": status}
+    _record("reports", labels=labels)
+    if duration:
+        _record_duration("report_duration", duration, labels={"symbol": symbol})
+
+
+def record_validation(symbol: str, valid: bool, error: Optional[str] = None):
+    """Record symbol validation."""
+    status = "valid" if valid else "invalid"
+    labels = {"symbol": symbol, "status": status}
+    _record("validations", labels=labels)
+    if not valid:
+        error_type = error or "unknown"
+        _record("errors", labels={"type": "validation", "location": error_type})
+
+
+def record_error(error_type: str, location: str = "unknown"):
+    """Record an error."""
+    _record("errors", labels={"type": error_type, "location": location})
+
+
+def get_summary() -> Dict[str, Any]:
+    """Get metrics summary."""
+    with _lock:
+        avg_durations = {
+            name: sum(durs) / len(durs) if durs else 0
+            for name, durs in _durations.items()
+        }
+        return {
+            "counts": dict(_counts),
+            "avg_durations": avg_durations,
+            "prometheus_enabled": _prometheus_enabled,
+        }
 
 
 def metrics_enabled() -> bool:
-    """Check if metrics are enabled."""
-    return _metrics_enabled
+    """Always True."""
+    return True
 
 
-# Initialize metrics on module import
-initialize_metrics()
+def initialize_metrics():
+    """Initialize metrics (calls Prometheus initialization)."""
+    initialize_prometheus_metrics()
 
+
+def get_metrics_status() -> Dict[str, Any]:
+    """Get status."""
+    return {
+        "enabled": True,
+        "prometheus_enabled": _prometheus_enabled,
+    }

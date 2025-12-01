@@ -450,7 +450,8 @@ class TestFullWorkflow:
         # Verify tool was called to get company info
         mock_get_company_info.invoke.assert_called_once()
         call_args = mock_get_company_info.invoke.call_args
-        assert call_args.kwargs["symbol"] == "TESTCOMP"
+        # invoke is called with a dict as first positional argument: invoke({"symbol": "TESTCOMP"})
+        assert call_args[0][0]["symbol"] == "TESTCOMP"
     
     @pytest.mark.asyncio
     @patch('main.MultiAgentOrchestrator')
@@ -497,13 +498,13 @@ class TestFullWorkflow:
         # Verify validation was called with normalized symbol
         mock_validate_symbol.invoke.assert_called_once()
         call_args = mock_validate_symbol.invoke.call_args
-        assert call_args.kwargs["symbol"] == "TESTCOMP"  # .NS should be removed
+        # invoke is called with a dict as first positional argument: invoke({"symbol": "TESTCOMP"})
+        assert call_args[0][0]["symbol"] == "TESTCOMP"  # .NS should be removed
     
-    @pytest.mark.asyncio
     @patch('main.MultiAgentOrchestrator')
     @patch('main.tool_validate_symbol')
     @patch('main.tool_get_company_info')
-    async def test_generate_report_sync(
+    def test_generate_report_sync(
         self,
         mock_get_company_info,
         mock_validate_symbol,
@@ -522,15 +523,18 @@ class TestFullWorkflow:
         
         # Mock orchestrator
         mock_orchestrator = MagicMock()
-        mock_orchestrator.run_workflow = AsyncMock(return_value={
-            "workflow_status": "completed",
-            "stock_symbol": "TESTCOMP",
-            "company_name": "Test Company Limited",
-            "sector": "Technology",
-            "final_report": "# Test Report",
-            "duration_seconds": 20.0,
-            "errors": []
-        })
+        # Create a future that will be resolved by asyncio.run
+        async def mock_workflow(*args, **kwargs):
+            return {
+                "workflow_status": "completed",
+                "stock_symbol": "TESTCOMP",
+                "company_name": "Test Company Limited",
+                "sector": "Technology",
+                "final_report": "# Test Report",
+                "duration_seconds": 20.0,
+                "errors": []
+            }
+        mock_orchestrator.run_workflow = AsyncMock(side_effect=mock_workflow)
         mock_orchestrator_class.return_value = mock_orchestrator
         
         # Initialize generator
@@ -539,7 +543,7 @@ class TestFullWorkflow:
             skip_pdf=True
         )
         
-        # Test sync wrapper
+        # Test sync wrapper - use asyncio.run which will work in non-async context
         results = generator.generate_report_sync(
             stock_symbol="TESTCOMP"
         )

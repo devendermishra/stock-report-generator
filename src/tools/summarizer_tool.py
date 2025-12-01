@@ -93,16 +93,16 @@ def initialize_summarizer(api_key: str, model: str = None):
 def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Summarize financial documents, reports, and text content with AI-powered analysis.
-    
+
     Creates concise summaries of financial documents, extracting key points, sentiment analysis,
     and structured insights. Useful for processing earnings reports, analyst notes, and
     management discussions.
-    
+
     Args:
         text: The text content to summarize.
         max_length: Maximum word count for the summary (default: 500).
         focus_areas: Optional list of focus areas to emphasize.
-    
+
     Returns:
         Dictionary containing original_text, summary, key_points, sentiment, confidence,
         word_count, and summary_ratio. Returns dictionary with 'error' key if summarization fails.
@@ -110,7 +110,7 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
     try:
         if not _api_key:
             return {"error": "Summarizer not initialized. Call initialize_summarizer() first."}
-        
+
         if not text.strip():
             return {
                 "original_text": text,
@@ -122,14 +122,14 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
                 "summary_ratio": 0.0,
                 "error": "Empty text provided"
             }
-        
+
         # Prepare the prompt
         prompt = create_summarization_prompt(text, max_length, focus_areas)
-        
+
         # Call OpenAI API with guardrails validation and logging
         import time
         start_time = time.time()
-        
+
         try:
             # Use guardrails wrapper if available, otherwise fallback to direct call
             llm_wrapper = get_llm_wrapper()
@@ -140,7 +140,8 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=max_length * 2,  # Allow for structured output
-                    temperature=0.1
+                    temperature=0.1,
+                    agent_name="SummarizerTool"
                 )
             else:
                 # Fallback to direct OpenAI call with logging
@@ -158,10 +159,10 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
                     temperature=0.1,
                     agent_name="SummarizerTool"
                 )
-            
+
             duration_ms = int((time.time() - start_time) * 1000)
             result_text = response.choices[0].message.content
-            
+
         except Exception as api_error:
             logger.error(f"OpenAI API error: {api_error}")
             return {
@@ -174,7 +175,7 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
                 "summary_ratio": 0.0,
                 "error": f"API error: {str(api_error)}"
             }
-        
+
         # Parse the structured response
         try:
             result_data = json.loads(result_text)
@@ -186,12 +187,12 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
                 "sentiment": "neutral",
                 "confidence": 0.8
             }
-        
+
         # Calculate metrics
         word_count = len(text.split())
         summary_word_count = len(result_data.get("summary", "").split())
         summary_ratio = summary_word_count / word_count if word_count > 0 else 0
-        
+
         return {
             "original_text": text,
             "summary": result_data.get("summary", ""),
@@ -201,7 +202,7 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
             "word_count": word_count,
             "summary_ratio": summary_ratio
         }
-        
+
     except Exception as e:
         logger.error(f"Error in text summarization: {e}")
         return {
@@ -223,15 +224,15 @@ def summarize_text(text: str, max_length: int = 500, focus_areas: Optional[List[
 def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Extract key insights, metrics, and structured information from financial documents.
-    
+
     Performs deep analysis of financial text to extract actionable insights, categorize them
     by type, and provide comprehensive sentiment analysis. Designed for earnings call transcripts,
     annual reports, and financial statements.
-    
+
     Args:
         text: The text content to analyze. Should contain financial or business-related information.
         categories: Optional list of categories to focus on.
-    
+
     Returns:
         Dictionary containing insights (list), categories (dict), sentiment_analysis (dict),
         and key_metrics (dict). Returns dictionary with 'error' key if extraction fails.
@@ -239,7 +240,7 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
     try:
         if not _api_key:
             return {"error": "Summarizer not initialized. Call initialize_summarizer() first."}
-        
+
         if not text.strip():
             return {
                 "insights": [],
@@ -248,10 +249,10 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
                 "key_metrics": {},
                 "error": "Empty text provided"
             }
-        
+
         # Prepare the prompt
         prompt = create_insight_extraction_prompt(text, categories)
-        
+
         # Call OpenAI API with guardrails validation
         try:
             # Use guardrails wrapper if available, otherwise fallback to direct call
@@ -263,7 +264,8 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=1000,
-                    temperature=0.1
+                    temperature=0.1,
+                    agent_name="SummarizerTool"
                 )
             else:
                 # Fallback to direct OpenAI call with logging
@@ -281,9 +283,9 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
                     temperature=0.1,
                     agent_name="SummarizerTool"
                 )
-            
+
             result_text = response.choices[0].message.content
-            
+
         except Exception as api_error:
             logger.error(f"OpenAI API error: {api_error}")
             return {
@@ -293,7 +295,7 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
                 "key_metrics": {},
                 "error": f"API error: {str(api_error)}"
             }
-        
+
         # Parse the structured response
         try:
             result_data = json.loads(result_text)
@@ -305,14 +307,14 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
                 "sentiment_analysis": {"sentiment": "neutral", "confidence": 0.5},
                 "key_metrics": {}
             }
-        
+
         return {
             "insights": result_data.get("insights", []),
             "categories": result_data.get("categories", {}),
             "sentiment_analysis": result_data.get("sentiment_analysis", {}),
             "key_metrics": result_data.get("key_metrics", {})
         }
-        
+
     except Exception as e:
         logger.error(f"Error in insight extraction: {e}")
         return {
@@ -327,15 +329,15 @@ def extract_insights(text: str, categories: Optional[List[str]] = None) -> Dict[
 class SummarizerTool:
     """
     Summarizer Tool for text summarization and insight extraction.
-    
+
     Provides AI-powered summarization capabilities for financial documents,
     management discussions, and other text content.
     """
-    
+
     def __init__(self, api_key: str, model: str = None):
         """
         Initialize the Summarizer Tool.
-        
+
         Args:
             api_key: OpenAI API key
             model: Model to use for summarization (defaults to Config.DEFAULT_MODEL)
@@ -349,7 +351,7 @@ class SummarizerTool:
             logger.info("Guardrails initialized for LLM call validation")
         except Exception as e:
             logger.warning(f"Failed to initialize guardrails: {e}. Continuing without guardrails validation.")
-        
+
     def summarize_text(
         self,
         text: str,
@@ -358,12 +360,12 @@ class SummarizerTool:
     ) -> SummaryResult:
         """
         Summarize a given text with focus on specific areas.
-        
+
         Args:
             text: Text to summarize
             max_length: Maximum length of summary
             focus_areas: Optional list of focus areas (e.g., ['financial', 'strategic'])
-            
+
         Returns:
             SummaryResult object
         """
@@ -378,14 +380,14 @@ class SummarizerTool:
                     word_count=0,
                     summary_ratio=0.0
                 )
-                
+
             # Prepare the prompt
             prompt = create_summarization_prompt(text, max_length, focus_areas)
-            
+
             # Call OpenAI API with guardrails validation and logging
             import time
             start_time = time.time()
-            
+
             try:
                 # Use guardrails wrapper if available, otherwise fallback to direct call
                 llm_wrapper = get_llm_wrapper()
@@ -396,7 +398,8 @@ class SummarizerTool:
                             {"role": "user", "content": prompt}
                         ],
                         max_tokens=max_length * 2,  # Allow for structured output
-                        temperature=0.1
+                        temperature=0.1,
+                        agent_name="SummarizerTool"
                     )
                 else:
                     # Fallback to direct OpenAI call with logging
@@ -414,22 +417,22 @@ class SummarizerTool:
                         temperature=0.1,
                         agent_name="SummarizerTool"
                     )
-                
+
                 duration_ms = int((time.time() - start_time) * 1000)
                 result_text = response.choices[0].message.content
-                
+
             except Exception as api_error:
                 openai_logger.log_error(api_error, self.model, "SummarizerTool")
                 raise api_error
-            
+
             # Parse the structured response
             summary_data = parse_summary_response(result_text)
-            
+
             # Calculate metrics
             word_count = len(text.split())
             summary_word_count = len(summary_data.get('summary', '').split())
             summary_ratio = summary_word_count / word_count if word_count > 0 else 0
-            
+
             return SummaryResult(
                 original_text=text,
                 summary=summary_data.get('summary', ''),
@@ -439,7 +442,7 @@ class SummarizerTool:
                 word_count=word_count,
                 summary_ratio=summary_ratio
             )
-            
+
         except Exception as e:
             logger.error(f"Error summarizing text: {e}")
             return SummaryResult(
@@ -451,7 +454,7 @@ class SummarizerTool:
                 word_count=len(text.split()),
                 summary_ratio=0.0
             )
-            
+
     def summarize_document_chunks(
         self,
         chunks: List[str],
@@ -459,11 +462,11 @@ class SummarizerTool:
     ) -> SummaryResult:
         """
         Summarize multiple document chunks into a cohesive summary.
-        
+
         Args:
             chunks: List of text chunks to summarize
             max_summary_length: Maximum length of final summary
-            
+
         Returns:
             SummaryResult object
         """
@@ -478,13 +481,13 @@ class SummarizerTool:
                     word_count=0,
                     summary_ratio=0.0
                 )
-                
+
             # Combine chunks with separators
             combined_text = "\n\n---\n\n".join(chunks)
-            
+
             # Create prompt for multi-chunk summarization
             prompt = create_document_chunks_prompt(combined_text, max_summary_length)
-            
+
             # Use guardrails wrapper if available, otherwise fallback to direct call
             llm_wrapper = get_llm_wrapper()
             if llm_wrapper:
@@ -494,7 +497,8 @@ class SummarizerTool:
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=max_summary_length * 2,
-                    temperature=0.1
+                    temperature=0.1,
+                    agent_name="SummarizerTool"
                 )
             else:
                 # Fallback to direct OpenAI call with logging
@@ -512,17 +516,17 @@ class SummarizerTool:
                     temperature=0.1,
                     agent_name="SummarizerTool"
                 )
-            
+
             result_text = response.choices[0].message.content
-            
+
             # Parse the structured response
             summary_data = parse_summary_response(result_text)
-            
+
             # Calculate metrics
             total_word_count = sum(len(chunk.split()) for chunk in chunks)
             summary_word_count = len(summary_data.get('summary', '').split())
             summary_ratio = summary_word_count / total_word_count if total_word_count > 0 else 0
-            
+
             return SummaryResult(
                 original_text=combined_text,
                 summary=summary_data.get('summary', ''),
@@ -532,7 +536,7 @@ class SummarizerTool:
                 word_count=total_word_count,
                 summary_ratio=summary_ratio
             )
-            
+
         except Exception as e:
             logger.error(f"Error summarizing document chunks: {e}")
             return SummaryResult(
@@ -544,7 +548,7 @@ class SummarizerTool:
                 word_count=sum(len(chunk.split()) for chunk in chunks),
                 summary_ratio=0.0
             )
-            
+
     def extract_insights(
         self,
         text: str,
@@ -552,11 +556,11 @@ class SummarizerTool:
     ) -> InsightExtraction:
         """
         Extract insights and categorize them from text.
-        
+
         Args:
             text: Text to analyze
             insight_categories: Optional list of categories to focus on
-            
+
         Returns:
             InsightExtraction object
         """
@@ -568,7 +572,7 @@ class SummarizerTool:
                     sentiment_analysis={},
                     key_metrics={}
                 )
-                
+
             # Default categories if none provided
             if insight_categories is None:
                 insight_categories = [
@@ -578,9 +582,9 @@ class SummarizerTool:
                     "risk_factors",
                     "growth_opportunities"
                 ]
-                
+
             prompt = create_insight_categorization_prompt(text, insight_categories)
-            
+
             # Use guardrails wrapper if available, otherwise fallback to direct call
             llm_wrapper = get_llm_wrapper()
             if llm_wrapper:
@@ -590,7 +594,8 @@ class SummarizerTool:
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=1500,
-                    temperature=0.1
+                    temperature=0.1,
+                    agent_name="SummarizerTool"
                 )
             else:
                 # Fallback to direct OpenAI call with logging
@@ -608,19 +613,19 @@ class SummarizerTool:
                     temperature=0.1,
                     agent_name="SummarizerTool"
                 )
-            
+
             result_text = response.choices[0].message.content
-            
+
             # Parse the structured response
             insight_data = parse_insight_response(result_text)
-            
+
             return InsightExtraction(
                 insights=insight_data.get('insights', []),
                 categories=insight_data.get('categories', {}),
                 sentiment_analysis=insight_data.get('sentiment_analysis', {}),
                 key_metrics=insight_data.get('key_metrics', {})
             )
-            
+
         except Exception as e:
             logger.error(f"Error extracting insights: {e}")
             return InsightExtraction(
@@ -629,12 +634,12 @@ class SummarizerTool:
                 sentiment_analysis={},
                 key_metrics={}
             )
-            
-            
+
+
     def validate_api_key(self) -> bool:
         """
         Validate the OpenAI API key.
-        
+
         Returns:
             True if API key is valid, False otherwise
         """
@@ -644,7 +649,8 @@ class SummarizerTool:
             if llm_wrapper:
                 response = llm_wrapper.chat_completion(
                     messages=[{"role": "user", "content": "Test"}],
-                    max_tokens=5
+                    max_tokens=5,
+                    agent_name="SummarizerTool"
                 )
             else:
                 # Fallback to direct OpenAI call with logging

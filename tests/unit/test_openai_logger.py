@@ -311,3 +311,4 @@ class TestOpenAILogger:
         # gpt-4o should have higher cost
         assert entry2.cost_estimate > entry.cost_estimate
 
+

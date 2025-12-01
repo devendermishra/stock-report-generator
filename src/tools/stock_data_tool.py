@@ -20,9 +20,14 @@ from .stock_data_validator import StockDataValidator
 try:
     from ..utils.retry import retry_tool_call
     from ..config import Config
+    from ..utils.metrics import record_validation
 except ImportError:
     from utils.retry import retry_tool_call
     from config import Config
+    try:
+        from utils.metrics import record_validation
+    except ImportError:
+        record_validation = lambda *args, **kwargs: None
 
 logger = logging.getLogger(__name__)
 
@@ -250,35 +255,43 @@ def validate_symbol(symbol: str) -> Dict[str, Any]:
         info = _get_ticker_info_with_retry(stock)
         
         if not info or 'symbol' not in info:
-            return {
+            result = {
                 "valid": False,
                 "symbol": symbol,
                 "error": "Symbol not found"
             }
+            record_validation(symbol, False, "symbol_not_found")
+            return result
         
         # Try to get recent price data with retry
         hist = _get_ticker_history_with_retry(stock, period="1d")
         if hist.empty:
-            return {
+            result = {
                 "valid": False,
                 "symbol": symbol,
                 "error": "No price data available"
             }
+            record_validation(symbol, False, "no_price_data")
+            return result
         
-        return {
+        result = {
             "valid": True,
             "symbol": symbol,
             "company_name": info.get('longName', 'Unknown'),
             "sector": info.get('sector', 'Unknown')
         }
+        record_validation(symbol, True)
+        return result
         
     except Exception as e:
         logger.error(f"Error validating symbol {symbol}: {e}")
-        return {
+        result = {
             "valid": False,
             "symbol": symbol,
             "error": f"Validation failed: {str(e)}"
         }
+        record_validation(symbol, False, "exception")
+        return result
 
 class StockDataTool:
     """
