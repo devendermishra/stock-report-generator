@@ -208,3 +208,6 @@ __marimo__/
 reports/
 temp/
 .idea/
+
+# Prometheus multiprocess metrics
+prometheus_multiproc_dir/

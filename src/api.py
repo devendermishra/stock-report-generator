@@ -211,6 +211,30 @@ async def root():
     }
 
 
+@app.get("/metrics")
+async def metrics_endpoint():
+    """Prometheus metrics endpoint."""
+    try:
+        from prometheus_client import generate_latest, CollectorRegistry, REGISTRY
+        from prometheus_client.multiprocess import MultiProcessCollector
+        
+        # Check if multiprocess mode is enabled
+        import os
+        prometheus_multiproc_dir = os.environ.get('PROMETHEUS_MULTIPROC_DIR')
+        
+        if prometheus_multiproc_dir and os.path.exists(prometheus_multiproc_dir):
+            # Multiprocess mode: aggregate metrics from all workers
+            registry = CollectorRegistry()
+            MultiProcessCollector(registry)
+            return PlainTextResponse(generate_latest(registry), media_type="text/plain")
+        else:
+            # Single process mode: use default registry
+            return PlainTextResponse(generate_latest(REGISTRY), media_type="text/plain")
+    except Exception as e:
+        logger.error(f"Failed to generate metrics: {e}", exc_info=True)
+        return PlainTextResponse("# Metrics not available\n", status_code=503)
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

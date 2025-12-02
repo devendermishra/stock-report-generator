@@ -110,6 +110,7 @@ class LLMGuardrailsWrapper:
         Raises:
             ValueError: If guardrails validation fails
         """
+        start_time = time.time()  # Set start time early to capture all errors
         try:
             # Step 1: Validate input with guardrails
             input_guardrail_results = None
@@ -167,8 +168,6 @@ class LLMGuardrailsWrapper:
                 messages_with_session = messages
 
             # Step 3: Make the actual API call with retry logic
-            start_time = time.time()
-
             @retry_llm_call()
             def _make_call():
                 return self.client.chat.completions.create(
@@ -267,10 +266,7 @@ class LLMGuardrailsWrapper:
             return response
 
         except ValueError:
-            # Re-raise validation errors
-            raise
-        except Exception as e:
-            # Record failed request metrics
+            # Re-raise validation errors (but still record metrics)
             try:
                 duration_seconds = time.time() - start_time
                 record_llm_request_from_response(
@@ -280,9 +276,31 @@ class LLMGuardrailsWrapper:
                     duration=duration_seconds,
                     success=False
                 )
-                record_error("llm_call_failed", f"llm_guardrails.{type(e).__name__}")
+                record_error("llm_validation_failed", f"llm_guardrails.{type(e).__name__}")
             except Exception:
-                pass  # Don't fail on metrics errors
+                pass
+            raise
+        except Exception as e:
+            # Record failed request metrics - ensure this happens for ALL errors including auth errors
+            try:
+                duration_seconds = time.time() - start_time
+                record_llm_request_from_response(
+                    model=self.model_name,
+                    response=None,
+                    agent=agent_name,
+                    duration=duration_seconds,
+                    success=False
+                )
+                # Detect authentication/API key errors
+                error_type = type(e).__name__
+                error_location = "llm_guardrails"
+                error_msg = str(e).lower()
+                if "key" in error_msg or "authentication" in error_msg or "invalid" in error_msg or "unauthorized" in error_msg:
+                    error_location = "llm_guardrails.authentication_error"
+                record_error("llm_call_failed", f"{error_location}.{error_type}")
+            except Exception as metrics_err:
+                # Log but don't fail - metrics recording should never break the flow
+                logger.debug(f"Failed to record error metrics: {metrics_err}")
 
             logger.error(f"Error in chat completion: {e}")
             raise
@@ -293,6 +311,7 @@ class LLMGuardrailsWrapper:
         temperature: float = 0.1,
         max_tokens: int = 1000,
         expected_output_format: Optional[str] = None,
+        agent_name: str = "unknown_agent",
         **kwargs
     ) -> Any:
         """
@@ -303,6 +322,7 @@ class LLMGuardrailsWrapper:
             temperature: Temperature for generation
             max_tokens: Maximum tokens to generate
             expected_output_format: Expected output format (e.g., "json", "markdown")
+            agent_name: Name of the agent making the call
             **kwargs: Additional arguments for OpenAI API
 
         Returns:
@@ -311,6 +331,7 @@ class LLMGuardrailsWrapper:
         Raises:
             ValueError: If guardrails validation fails
         """
+        start_time = time.time()  # Set start time early to capture all errors
         try:
             # Step 1: Validate input with guardrails
             input_guardrail_results = None
@@ -368,8 +389,6 @@ class LLMGuardrailsWrapper:
                 messages_with_session = messages
 
             # Step 3: Make the actual API call with retry logic
-            start_time = time.time()
-
             @async_retry_llm_call()
             async def _make_call():
                 return await self.async_client.chat.completions.create(
@@ -468,10 +487,7 @@ class LLMGuardrailsWrapper:
             return response
 
         except ValueError:
-            # Re-raise validation errors
-            raise
-        except Exception as e:
-            # Record failed request metrics
+            # Re-raise validation errors (but still record metrics)
             try:
                 duration_seconds = time.time() - start_time
                 record_llm_request_from_response(
@@ -481,9 +497,31 @@ class LLMGuardrailsWrapper:
                     duration=duration_seconds,
                     success=False
                 )
-                record_error("llm_call_failed", f"llm_guardrails.{type(e).__name__}")
+                record_error("llm_validation_failed", f"llm_guardrails.async.{type(e).__name__}")
             except Exception:
-                pass  # Don't fail on metrics errors
+                pass
+            raise
+        except Exception as e:
+            # Record failed request metrics - ensure this happens for ALL errors including auth errors
+            try:
+                duration_seconds = time.time() - start_time
+                record_llm_request_from_response(
+                    model=self.model_name,
+                    response=None,
+                    agent=agent_name,
+                    duration=duration_seconds,
+                    success=False
+                )
+                # Detect authentication/API key errors
+                error_type = type(e).__name__
+                error_location = "llm_guardrails.async"
+                error_msg = str(e).lower()
+                if "key" in error_msg or "authentication" in error_msg or "invalid" in error_msg or "unauthorized" in error_msg:
+                    error_location = "llm_guardrails.async.authentication_error"
+                record_error("llm_call_failed", f"{error_location}.{error_type}")
+            except Exception as metrics_err:
+                # Log but don't fail - metrics recording should never break the flow
+                logger.debug(f"Failed to record error metrics: {metrics_err}")
 
             logger.error(f"Error in async chat completion: {e}")
             raise

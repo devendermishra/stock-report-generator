@@ -120,19 +120,27 @@ def logged_chat_completion(
         return response
         
     except Exception as e:
-        # Record failed request metrics
+        # Record failed request metrics - ensure this happens even for auth errors
         try:
             duration_seconds = time.time() - start_time
+            # Record the failed request
             record_llm_request_from_response(
                 model=model,
                 response=None,
-                agent_name=agent_name,
+                agent=agent_name,
                 duration=duration_seconds,
                 success=False
             )
-            record_error("llm_call_failed", f"openai_call_wrapper.{type(e).__name__}")
-        except Exception:
-            pass  # Don't fail on metrics errors
+            # Record specific error type
+            error_type = type(e).__name__
+            error_location = "openai_call_wrapper"
+            # Check for specific error types
+            if "key" in str(e).lower() or "authentication" in str(e).lower() or "invalid" in str(e).lower():
+                error_location = "openai_call_wrapper.authentication_error"
+            record_error("llm_call_failed", f"{error_location}.{error_type}")
+        except Exception as metrics_err:
+            # Log but don't fail - metrics recording should never break the flow
+            logger.debug(f"Failed to record error metrics: {metrics_err}")
         
         logger.error(f"OpenAI API call failed: {e}")
         raise
@@ -232,18 +240,24 @@ async def logged_async_chat_completion(
         return response
         
     except Exception as e:
-        # Record failed request metrics
+        # Record failed request metrics - ensure this happens even for auth errors
         try:
             duration_seconds = time.time() - start_time
             record_llm_request_from_response(
                 model=model,
                 response=None,
-                agent_name=agent_name,
-                duration_seconds=duration_seconds,
+                agent=agent_name,
+                duration=duration_seconds,
                 success=False
             )
-        except Exception:
-            pass  # Don't fail on metrics errors
+            # Record specific error type
+            error_type = type(e).__name__
+            error_location = "openai_call_wrapper.async"
+            if "key" in str(e).lower() or "authentication" in str(e).lower() or "invalid" in str(e).lower():
+                error_location = "openai_call_wrapper.async.authentication_error"
+            record_error("llm_call_failed", f"{error_location}.{error_type}")
+        except Exception as metrics_err:
+            logger.debug(f"Failed to record error metrics: {metrics_err}")
         
         logger.error(f"OpenAI async API call failed: {e}")
         raise
